@@ -33,41 +33,52 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
-# Domain vocabulary for enriched agricultural query embeddings
+# Structured domain slot mappings for high-precision 256-dimensional embeddings
 # ---------------------------------------------------------------------------
-_PLANT_TERMS = {
-    "apple", "tomato", "potato", "grape", "corn", "maize", "strawberry",
-    "cherry", "peach", "pepper", "squash", "soybean", "citrus", "orange",
-    "lemon", "blueberry", "raspberry", "wheat", "rice", "cotton", "coffee",
-    "banana", "mango", "cucumber", "bean", "pea", "sunflower"
+_PLANT_SLOTS = {
+    'apple': 0, 'tomato': 1, 'potato': 2, 'grape': 3, 'corn': 4, 'maize': 4,
+    'cherry': 5, 'peach': 6, 'pepper': 7, 'squash': 8, 'strawberry': 9,
+    'orange': 10, 'citrus': 10, 'blueberry': 11, 'raspberry': 12, 'soybean': 13,
+    'wheat': 14, 'rice': 15, 'cotton': 16, 'cucumber': 17, 'bean': 18
 }
 
-_DISEASE_TERMS = {
-    "scab", "blight", "rot", "rust", "mildew", "mold", "spot", "mosaic",
-    "virus", "wilt", "canker", "lesion", "chlorosis", "necrosis", "streak",
-    "yellowing", "browning", "curl", "burn", "greening", "dieback",
-    "anthracnose", "cercospora", "septoria", "alternaria", "powdery",
-    "downy", "bacterial", "fungal", "viral", "nematode", "oomycete",
-    "early_blight", "late_blight", "black_rot", "leaf_mold", "leaf_scorch",
-    "target_spot", "haunglongbing"
+_DISEASE_SLOTS = {
+    'scab': 30, 'black_rot': 31, 'cedar_apple_rust': 32, 'rust': 33, 'powdery_mildew': 34,
+    'mildew': 35, 'cercospora': 36, 'gray_leaf_spot': 37, 'northern_leaf_blight': 38,
+    'esca': 39, 'measles': 39, 'isariopsis': 40, 'haunglongbing': 41, 'greening': 41,
+    'bacterial_spot': 42, 'early_blight': 43, 'late_blight': 44, 'leaf_scorch': 45,
+    'leaf_mold': 46, 'mold': 46, 'septoria': 47, 'spider_mite': 48, 'mite': 48,
+    'target_spot': 49, 'yellow_leaf_curl': 50, 'mosaic': 51, 'virus': 51,
+    'blight': 52, 'rot': 53, 'spot': 54, 'canker': 55, 'anthracnose': 56
 }
 
-_SYMPTOM_TERMS = {
-    "spots", "rings", "pustules", "lesion", "discoloration", "defoliation",
-    "yellowing", "wilting", "stunting", "streaking", "mottling", "curling",
-    "scorching", "webbing", "stippling", "laceration", "cracks", "cankers",
-    "mummies", "galls", "spores", "coating", "watersoaked", "brown", "black",
-    "olive", "grey", "tan", "orange", "yellow"
+_STATUS_SLOTS = {
+    'healthy': 70, 'vigorous': 71, 'diseased': 72, 'infected': 72
 }
 
-_CONDITION_TERMS = {
-    "humidity", "moisture", "wet", "dry", "rain", "temperature", "warm",
-    "cool", "hot", "wind", "soil", "residue", "stress", "rotation",
-    "overhead", "irrigation", "canopy", "spacing", "pruning", "sanitation"
+_SYMPTOM_SLOTS = {
+    'spots': 80, 'rings': 81, 'concentric': 82, 'target': 82, 'pustules': 83,
+    'lesion': 84, 'lesions': 84, 'discoloration': 85, 'defoliation': 86,
+    'yellowing': 87, 'wilting': 88, 'stunting': 89, 'curling': 90, 'cupping': 90,
+    'scorching': 91, 'webbing': 92, 'stippling': 93, 'scab': 94, 'scabs': 94,
+    'watersoaked': 95, 'velvety': 96, 'olive': 97, 'mottled': 98, 'mottling': 98,
+    'downy': 99, 'powdery': 100, 'shot': 101, 'mummies': 102, 'galls': 103,
+    'halo': 104, 'necrosis': 105, 'chlorosis': 106
 }
 
-_SEVERITY_TERMS = {
-    "severe", "mild", "moderate", "heavy", "light", "acute", "chronic"
+_TREATMENT_SLOTS = {
+    'copper': 120, 'sulfur': 121, 'fungicide': 122, 'fungicides': 122, 'bactericide': 123,
+    'neem': 124, 'mancozeb': 125, 'chlorothalonil': 126, 'myclobutanil': 127,
+    'captan': 128, 'mefenoxam': 129, 'cymoxanil': 130, 'azoxystrobin': 131,
+    'pruning': 132, 'prune': 132, 'mulch': 133, 'mulching': 133, 'rotation': 134,
+    'biocontrol': 135, 'bacteriophage': 136, 'soap': 137, 'oil': 138, 'drip': 139,
+    'trellis': 140, 'sanitation': 141
+}
+
+_CONDITION_SLOTS = {
+    'humidity': 160, 'humid': 160, 'moisture': 161, 'wet': 162, 'rain': 163, 'rainy': 163,
+    'warm': 164, 'cool': 165, 'hot': 166, 'dew': 167, 'overhead': 168, 'season': 169,
+    'spring': 170, 'summer': 171, 'autumn': 172, 'winter': 173
 }
 
 
@@ -77,7 +88,7 @@ class VectorStore:
 
     Supports:
     - Exact canonical ID lookup via hash map
-    - Enriched TF-IDF-style text-to-vector encoding with agricultural domain boosting
+    - Structured semantic domain-slot text-to-vector encoding
     - FAISS (if available) or NumPy cosine fallback for top-k similarity search
     - ChromaDB persistence (if available)
     - Disease-condition natural language query support
@@ -123,59 +134,82 @@ class VectorStore:
         """Tokenises text into lowercase alpha-numeric tokens."""
         return re.findall(r"[a-z0-9]+", text.lower())
 
-    def _domain_boost(self, token: str) -> float:
-        """
-        Returns a domain importance multiplier for agricultural tokens.
-        Plant names and disease names get the highest boost; symptom and
-        condition terms get moderate boosts.
-        """
-        if token in _PLANT_TERMS:
-            return 3.5
-        if token in _DISEASE_TERMS:
-            return 3.0
-        if token in _SYMPTOM_TERMS:
-            return 2.0
-        if token in _CONDITION_TERMS:
-            return 1.5
-        if token in _SEVERITY_TERMS:
-            return 1.2
-        return 1.0
-
     def _text_to_vector(self, text: str) -> np.ndarray:
         """
-        Generates a domain-boosted, L2-normalised pseudo-embedding.
+        Generates a domain-boosted, L2-normalised semantic embedding vector.
 
-        Strategy: deterministic hash-based TF-style accumulation with:
-        - Multiple overlapping hash planes for better collision spread
-        - Agricultural domain vocabulary boosting
-        - Token position decay (earlier tokens weighted slightly higher)
+        Strategy: Structured domain slot allocation for high discriminability
+        between plant species, pathologies, symptoms, conditions, and treatments,
+        with a general polynomial hash dispersion range for vocabulary tail tokens.
         """
         vec = np.zeros(self.dimension, dtype=np.float32)
         tokens = self._tokenize(text)
-        token_freq: Dict[str, int] = {}
-        for tok in tokens:
-            token_freq[tok] = token_freq.get(tok, 0) + 1
-
-        # Compute IDF-like discount for very frequent generic tokens
-        total = max(len(tokens), 1)
+        if not tokens:
+            return vec
 
         for idx, token in enumerate(tokens):
-            tf = token_freq[token] / total
-            boost = self._domain_boost(token)
-            pos_weight = 1.0 / (1.0 + 0.05 * idx)  # slight position decay
+            pos_weight = 1.0 / (1.0 + 0.02 * idx)
 
-            # Use three independent hash planes to spread the signal
-            char_sum = sum(ord(c) for c in token)
-            for plane_offset in (0, self.dimension // 3, 2 * self.dimension // 3):
-                slot = (char_sum + plane_offset * 7) % self.dimension
-                vec[slot] += tf * boost * pos_weight
+            # 1. Plant species domain slot
+            if token in _PLANT_SLOTS:
+                slot = _PLANT_SLOTS[token]
+                if slot < self.dimension:
+                    vec[slot] += 4.0 * pos_weight
 
-            # Add bigram signal for consecutive tokens
+            # 2. Disease taxonomy slot
+            if token in _DISEASE_SLOTS:
+                slot = _DISEASE_SLOTS[token]
+                if slot < self.dimension:
+                    vec[slot] += 3.5 * pos_weight
+
+            # 3. Health status slot
+            if token in _STATUS_SLOTS:
+                slot = _STATUS_SLOTS[token]
+                if slot < self.dimension:
+                    vec[slot] += 3.0 * pos_weight
+
+            # 4. Symptom characteristic slot
+            if token in _SYMPTOM_SLOTS:
+                slot = _SYMPTOM_SLOTS[token]
+                if slot < self.dimension:
+                    vec[slot] += 2.5 * pos_weight
+
+            # 5. Treatment / control chemical slot
+            if token in _TREATMENT_SLOTS:
+                slot = _TREATMENT_SLOTS[token]
+                if slot < self.dimension:
+                    vec[slot] += 2.0 * pos_weight
+
+            # 6. Environmental / cultural condition slot
+            if token in _CONDITION_SLOTS:
+                slot = _CONDITION_SLOTS[token]
+                if slot < self.dimension:
+                    vec[slot] += 1.5 * pos_weight
+
+            # 7. Bigram signal for consecutive tokens
             if idx > 0:
                 prev = tokens[idx - 1]
-                bigram_val = sum(ord(c) for c in (prev + "_" + token))
-                bigram_slot = bigram_val % self.dimension
-                vec[bigram_slot] += 0.3 * boost * pos_weight
+                bigram = f"{prev}_{token}"
+                if bigram in _DISEASE_SLOTS:
+                    slot = _DISEASE_SLOTS[bigram]
+                    if slot < self.dimension:
+                        vec[slot] += 4.5 * pos_weight
+                elif bigram in _SYMPTOM_SLOTS:
+                    slot = _SYMPTOM_SLOTS[bigram]
+                    if slot < self.dimension:
+                        vec[slot] += 3.5 * pos_weight
+                elif bigram in _TREATMENT_SLOTS:
+                    slot = _TREATMENT_SLOTS[bigram]
+                    if slot < self.dimension:
+                        vec[slot] += 3.0 * pos_weight
+
+            # 8. General polynomial hash dispersion bucket (slots 200..255)
+            h = 5381
+            for c in token:
+                h = (((h << 5) + h) + ord(c)) & 0xFFFFFFFF
+            dispersion_slot = 200 + (h % max(1, self.dimension - 200))
+            if dispersion_slot < self.dimension:
+                vec[dispersion_slot] += 0.3 * pos_weight
 
         norm = np.linalg.norm(vec)
         if norm > 0:

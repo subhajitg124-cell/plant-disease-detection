@@ -1,0 +1,45 @@
+{
+  "device": "cpu",
+  "num_iterations": 100,
+  "preprocessing": {
+    "mean_ms": 0.961,
+    "median_ms": 0.893,
+    "min_ms": 0.732,
+    "max_ms": 1.445,
+    "p95_ms": 1.288,
+    "std_ms": 0.204
+  },
+  "vision_inference": {
+    "mean_ms": 11.003,
+    "median_ms": 11.057,
+    "min_ms": 9.071,
+    "max_ms": 11.984,
+    "p95_ms": 11.89,
+    "std_ms": 0.576
+  },
+  "rag_retrieval": {
+    "mean_ms": 0.002,
+    "median_ms": 0.002,
+    "min_ms": 0.001,
+    "max_ms": 0.021,
+    "p95_ms": 0.002,
+    "std_ms": 0.002
+  },
+  "advisory_generation": {
+    "mean_ms": 0.009,
+    "median_ms": 0.008,
+    "min_ms": 0.007,
+    "max_ms": 0.041,
+    "p95_ms": 0.015,
+    "std_ms": 0.004
+  },
+  "end_to_end_total": {
+    "mean_ms": 11.275,
+    "median_ms": 11.252,
+    "min_ms": 9.422,
+    "max_ms": 12.856,
+    "p95_ms": 12.454,
+    "std_ms": 0.646
+  },
+  "throughput_fps": 88.7
+}
