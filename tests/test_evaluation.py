@@ -1,7 +1,3 @@
-"""
-Unit Tests for Evaluation Metrics and Report Generation.
-"""
-
 import os
 import sys
 
@@ -14,7 +10,6 @@ import numpy as np
 
 from src.evaluation.metrics import calculate_metrics, ConfusionMatrix, calculate_topk_accuracy
 from src.evaluation.evaluator import ModelEvaluator
-
 
 class TestEvaluationModule(unittest.TestCase):
 
@@ -53,7 +48,6 @@ class TestEvaluationModule(unittest.TestCase):
 
         self.assertTrue(os.path.exists(json_p))
         self.assertTrue(os.path.exists(md_p))
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,11 +1,6 @@
-"""
-CNN Model Training Module for Plant Disease AI.
-"""
-
 import os
 import sys
 
-# Ensure root workspace directory is in sys.path
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
@@ -28,7 +23,6 @@ except ImportError:
 
 
 def create_synthetic_dataset(num_samples: int = 100, num_classes: int = 38):
-    """Generates synthetic PyTorch dataset for local training / testing."""
     if not HAS_TORCH:
         return None, None
 
@@ -38,7 +32,6 @@ def create_synthetic_dataset(num_samples: int = 100, num_classes: int = 38):
 
 
 def load_dataset_from_csv(csv_path: str, num_samples: int = 150):
-    """Loads dataset samples based on CSV split records."""
     import csv
     if not HAS_TORCH or not os.path.exists(csv_path):
         return create_synthetic_dataset(num_samples=num_samples, num_classes=38)
@@ -68,9 +61,6 @@ def train_model(
     train_csv: str = "data/processed/train.csv",
     device: Optional[str] = None
 ) -> Dict[str, Any]:
-    """
-    Trains PlantDiseaseCNN and saves model checkpoint.
-    """
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
     if not HAS_TORCH:
@@ -131,7 +121,6 @@ def train_model(
     }
     torch.save(checkpoint, save_path)
     
-    # Save to parent workspace models directory as well if it exists
     parent_models_dir = os.path.abspath(os.path.join(root_dir, "../models"))
     if os.path.exists(parent_models_dir):
         parent_save_path = os.path.join(parent_models_dir, "plant_disease_cnn.pth")
@@ -150,4 +139,3 @@ def train_model(
 
 if __name__ == "__main__":
     train_model(epochs=3)
-

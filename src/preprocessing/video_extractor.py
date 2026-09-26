@@ -1,10 +1,3 @@
-"""
-Video Frame Extraction and Quality Sampling Module.
-
-Provides frame sampling from video files (.mp4, .avi, .mov), blur quality filtering
-using Laplacian variance, exposure checks, and frame aggregation utilities.
-"""
-
 import os
 from typing import List, Tuple, Dict, Any, Optional
 import numpy as np
@@ -18,9 +11,6 @@ except ImportError:
 
 
 class VideoFrameExtractor:
-    """
-    Extracts, filters, and samples high-quality frames from video streams.
-    """
     def __init__(
         self,
         sample_interval_sec: float = 1.0,
@@ -36,10 +26,6 @@ class VideoFrameExtractor:
         self.max_brightness = max_brightness
 
     def compute_blur_score(self, image_np: np.ndarray) -> float:
-        """
-        Calculates blur metric using variance of Laplacian.
-        Higher score means sharper image; lower score indicates motion blur.
-        """
         if HAS_CV2:
             if image_np.ndim == 3:
                 gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
@@ -47,7 +33,6 @@ class VideoFrameExtractor:
                 gray = image_np
             return float(cv2.Laplacian(gray, cv2.CV_64F).var())
         else:
-            # Fallback blur estimate using discrete gradient variance
             if image_np.ndim == 3:
                 gray = np.mean(image_np, axis=2)
             else:
@@ -56,9 +41,6 @@ class VideoFrameExtractor:
             return float(np.var(gx) + np.var(gy))
 
     def check_exposure(self, image_np: np.ndarray) -> Tuple[bool, float]:
-        """
-        Evaluates mean intensity to detect underexposed (too dark) or overexposed frames.
-        """
         mean_val = float(np.mean(image_np))
         is_good = self.min_brightness <= mean_val <= self.max_brightness
         return is_good, mean_val
@@ -67,12 +49,6 @@ class VideoFrameExtractor:
         self,
         video_path: str
     ) -> List[Tuple[Image.Image, Dict[str, Any]]]:
-        """
-        Extracts frames from video file and filters for image quality.
-        
-        Returns:
-            List of tuples (PIL RGB Image, metadata dictionary).
-        """
         if not os.path.exists(video_path):
             raise FileNotFoundError(f"Video file not found at: {video_path}")
 
@@ -120,8 +96,6 @@ class VideoFrameExtractor:
 
             cap.release()
         else:
-            # Fallback mode for environments without OpenCV
-            # Create synthetic sequence of frames if testing
             synthetic_img = Image.new("RGB", (256, 256), color=(40, 160, 40))
             meta = {
                 "frame_index": 0,
@@ -135,7 +109,6 @@ class VideoFrameExtractor:
         return extracted
 
     def sample_frame_tensors(self, video_path: str, transformer) -> List[Any]:
-        """Convenience method to extract frames and transform to tensors."""
         frames_meta = self.extract_frames_from_video(video_path)
         tensors = [transformer.transform(img, return_tensor=True) for img, _ in frames_meta]
         return tensors

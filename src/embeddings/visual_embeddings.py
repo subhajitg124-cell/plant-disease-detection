@@ -1,11 +1,6 @@
-"""
-Deep Visual Embedding Extractor.
-"""
-
 import os
 import sys
 
-# Ensure workspace root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from typing import Union, List, Optional, Any
@@ -37,9 +32,6 @@ except ImportError:
 
 
 class VisualEmbeddingExtractor:
-    """
-    Feature Extractor for Deep Visual Embeddings.
-    """
     def __init__(
         self,
         model_path: Optional[str] = "models/plant_disease_cnn.pth",
@@ -71,9 +63,6 @@ class VisualEmbeddingExtractor:
             self.model = None
 
     def extract(self, input_source: Union[str, Image.Image, np.ndarray, Any]) -> List[float]:
-        """
-        Extracts L2-normalized float embedding list for a single image input.
-        """
         is_valid, data, _ = self.pipeline.process_image(input_source, return_tensor=True)
         if not is_valid or data is None:
             return [0.0] * self.embedding_dim
@@ -83,7 +72,7 @@ class VisualEmbeddingExtractor:
                 data = data.unsqueeze(0)
             data = data.to(self.device)
 
-            with torch.no_grad():  # type: ignore[attr-defined]
+            with torch.no_grad():
                 assert self.model is not None
                 emb_tensor = self.model.extract_features(data)
                 emb_np = emb_tensor.cpu().numpy()[0]
@@ -99,7 +88,6 @@ class VisualEmbeddingExtractor:
             return sub.tolist()
 
     def extract_batch(self, input_sources: List[Union[str, Image.Image, np.ndarray, Any]]) -> List[List[float]]:
-        """Extracts embeddings for a batch of images."""
         return [self.extract(src) for src in input_sources]
 
     def generate_and_cache_embeddings(
@@ -107,18 +95,14 @@ class VisualEmbeddingExtractor:
         output_path: str = "models/visual_embeddings_cache.npz",
         num_samples_per_class: int = 2
     ) -> str:
-        """
-        Generates reference visual embedding cache for baseline classes and saves to npz.
-        """
         embeddings = []
         labels = []
         
         for cid in range(38):
             for s in range(num_samples_per_class):
-                # Create synthetic leaf sample tensor/image for class representation
                 img_arr = np.zeros((224, 224, 3), dtype=np.uint8)
-                img_arr[:, :, 1] = 150 + (cid * 2) % 100  # Green channel variation
-                img_arr[30:70, 30:70, 0] = 100 + (cid * 3) % 150  # Spot variation
+                img_arr[:, :, 1] = 150 + (cid * 2) % 100
+                img_arr[30:70, 30:70, 0] = 100 + (cid * 3) % 150
                 emb = self.extract(img_arr)
                 embeddings.append(emb)
                 labels.append(cid)
@@ -135,4 +119,3 @@ class VisualEmbeddingExtractor:
 if __name__ == "__main__":
     extractor = VisualEmbeddingExtractor()
     extractor.generate_and_cache_embeddings()
-

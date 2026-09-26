@@ -1,25 +1,7 @@
-"""
-Advisory Generator Module.
-
-Integrates Vision CNN predictions with RAG Knowledge Base retrieval to construct
-grounded IntegratedResponse objects.
-
-Advisory Generation Flow:
-  1. Validate prediction status (gate out non-plant, uncertain, unknown)
-  2. Build RAG retrieval query from Vision prediction fields
-  3. Retrieve grounded advisory from knowledge base
-  4. Verify evidence grounding before final response assembly
-  5. Synthesise user-facing advisory message from retrieved evidence
-  6. Return fully-populated IntegratedResponse with evidence + sources
-
-All advisory text is grounded in retrieved KB documents.
-"""
-
 import os
 import sys
 from typing import Optional, List, Dict, Any, Union
 
-# Ensure root workspace directory is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from src.contracts import (
@@ -30,38 +12,12 @@ from src.retrieval.rag_retriever import RAGRetriever
 
 
 class AdvisoryGenerator:
-    """
-    Advisory Generation Engine for Plant Disease Diagnosis.
-
-    Orchestrates the full advisory prompt flow:
-      VisionPrediction → RAGQueryInput → AdvisoryResult → IntegratedResponse
-
-    Evidence grounding is verified before the response is assembled.
-    Ungrounded or low-confidence predictions are handled with appropriate
-    safety guardrails and clear user warnings.
-    """
-
     def __init__(self, retriever: Optional[RAGRetriever] = None):
         self.retriever = retriever if retriever is not None else RAGRetriever()
 
-    # -----------------------------------------------------------------------
-    # Main entry point
-    # -----------------------------------------------------------------------
-
     def generate_advisory(self, prediction: VisionPrediction) -> IntegratedResponse:
-        """
-        Full advisory generation pipeline for a single VisionPrediction.
-
-        Returns a fully-populated IntegratedResponse with:
-          - user_message: human-readable diagnosis summary
-          - advisory: structured AdvisoryResult (or None for gated statuses)
-          - evidence: flat list of grounding evidence chunks
-          - sources: KB source citations
-          - warnings: any safety or grounding warnings
-        """
         status = prediction.status
 
-        # ── Gate 1: Non-plant rejection ──────────────────────────────────────
         if status == PredictionStatus.NOT_A_PLANT.value:
             return IntegratedResponse(
                 prediction=prediction,
@@ -77,7 +33,6 @@ class AdvisoryGenerator:
                 warnings=["Validation failure: Non-plant or corrupted image detected."]
             )
 
-        # ── Gate 2: Low-confidence prediction ───────────────────────────────
         if status == PredictionStatus.UNCERTAIN.value:
             return IntegratedResponse(
                 prediction=prediction,
@@ -97,7 +52,6 @@ class AdvisoryGenerator:
                 ]
             )
 
-        # ── Gate 3: Out-of-distribution / unknown disease ───────────────────
         if status == PredictionStatus.UNKNOWN.value:
             return IntegratedResponse(
                 prediction=prediction,
@@ -114,40 +68,21 @@ class AdvisoryGenerator:
                 warnings=["Out-of-distribution plant disease detected — advisory unavailable."]
             )
 
-        # ── Supported: Full RAG retrieval + grounding flow ───────────────────
         return self._generate_grounded_advisory(prediction)
-
-    # -----------------------------------------------------------------------
-    # Grounded advisory pipeline
-    # -----------------------------------------------------------------------
 
     def _generate_grounded_advisory(
         self, prediction: VisionPrediction
     ) -> IntegratedResponse:
-        """
-        Full grounded advisory generation for a 'supported' prediction.
-
-        Steps:
-          1. Build RAGQueryInput from prediction
-          2. Retrieve AdvisoryResult from knowledge base
-          3. Verify grounding quality
-          4. Extract evidence chunks
-          5. Synthesise advisory message
-          6. Assemble IntegratedResponse
-        """
         warnings: List[str] = []
 
-        # Step 1: Build retrieval query
         rag_query = RAGQueryInput(
             plant=prediction.plant,
             disease=prediction.disease,
             canonical_id=prediction.canonical_id
         )
 
-        # Step 2: Retrieve advisory from KB
         advisory = self.retriever.retrieve(rag_query)
 
-        # Step 3: Grounding verification
         is_grounded = self.retriever.is_grounded(advisory)
         if not is_grounded:
             warnings.append(
@@ -155,13 +90,9 @@ class AdvisoryGenerator:
                 "Verify with a certified agronomist before taking action."
             )
 
-        # Step 4: Extract evidence chunks
         evidence_chunks = self.retriever.get_evidence_chunks(advisory, max_chunks=8)
-
-        # Step 5: Synthesise user-facing advisory message
         user_message = self._synthesise_message(prediction, advisory, is_grounded)
 
-        # Step 6: Assemble IntegratedResponse
         return IntegratedResponse(
             prediction=prediction,
             advisory=advisory,
@@ -173,65 +104,48 @@ class AdvisoryGenerator:
             warnings=warnings
         )
 
-    # -----------------------------------------------------------------------
-    # Prompt / message synthesis
-    # -----------------------------------------------------------------------
-
     def _synthesise_message(
         self,
         prediction: VisionPrediction,
         advisory: AdvisoryResult,
         is_grounded: bool
     ) -> str:
-        """
-        Synthesises a structured, human-readable advisory message from retrieved evidence.
-
-        The message is grounded in KB-retrieved content: symptoms, top prevention
-        steps, and top management actions are drawn directly from the AdvisoryResult.
-        """
         lines: List[str] = []
 
-        # Header
         conf_pct = prediction.confidence * 100
         lines.append(
             f"Diagnosis: {prediction.plant} — {prediction.disease} "
             f"({conf_pct:.1f}% confidence)."
         )
 
-        # Symptoms section (grounded)
         if advisory.symptoms:
             top_symptoms = advisory.symptoms[:3]
             lines.append(
                 "Observed symptoms: " + "; ".join(top_symptoms) + "."
             )
 
-        # Causes section (grounded)
         if advisory.causes:
             lines.append(
                 "Likely cause: " + advisory.causes[0] + "."
             )
 
-        # Risk factors
         if advisory.risk_factors:
             lines.append(
                 "Key risk factor: " + advisory.risk_factors[0] + "."
             )
 
-        # Prevention (grounded)
         if advisory.prevention:
             top_prevention = advisory.prevention[:2]
             lines.append(
                 "Recommended prevention: " + "; ".join(top_prevention) + "."
             )
 
-        # Management (grounded)
         if advisory.management:
             top_management = advisory.management[:2]
             lines.append(
                 "Treatment actions: " + "; ".join(top_management) + "."
             )
 
-        # Grounding quality notice
         if not is_grounded:
             lines.append(
                 "Note: Advisory is based on general guidelines. "
@@ -240,26 +154,12 @@ class AdvisoryGenerator:
 
         return " | ".join(lines)
 
-    # -----------------------------------------------------------------------
-    # Batch generation
-    # -----------------------------------------------------------------------
-
     def generate_batch(
         self, predictions: List[VisionPrediction]
     ) -> List[IntegratedResponse]:
-        """
-        Generates advisory responses for a list of VisionPrediction objects.
-        """
         return [self.generate_advisory(pred) for pred in predictions]
 
-    # -----------------------------------------------------------------------
-    # Image + advisory end-to-end (convenience wrapper)
-    # -----------------------------------------------------------------------
-
     def format_advisory_report(self, response: IntegratedResponse) -> str:
-        """
-        Formats an IntegratedResponse into a multi-section advisory report string.
-        """
         pred = response.prediction
         lines = [
             "=" * 60,
@@ -306,7 +206,6 @@ class AdvisoryGenerator:
 if __name__ == "__main__":
     generator = AdvisoryGenerator()
 
-    # Test 1: Supported prediction — should produce full grounded advisory
     pred_supported = VisionPrediction(
         plant="Apple",
         disease="Apple scab",
@@ -321,7 +220,6 @@ if __name__ == "__main__":
     print(f"\nGrounding verified: {bool(res.evidence)}")
     print(f"Sources: {res.sources}")
 
-    # Test 2: Uncertain prediction — should suppress advisory
     print("\n" + "=" * 60)
     pred_uncertain = VisionPrediction(
         plant="Tomato",
@@ -334,7 +232,6 @@ if __name__ == "__main__":
     print(f"Uncertain → Advisory: {res2.advisory}")
     print(f"Warning: {res2.warnings}")
 
-    # Test 3: Query-based retrieval
     print("\n[Query-based Retrieval]")
     similar = generator.retriever.search_similar(
         "tomato late blight phytophthora infestans cool wet weather management", top_k=3

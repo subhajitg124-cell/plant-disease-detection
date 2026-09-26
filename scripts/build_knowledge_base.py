@@ -1,10 +1,3 @@
-"""
-Agricultural Knowledge Base Generator Script.
-
-Generates structured disease, symptom, cause, prevention, and treatment guides
-for all 38 PlantVillage canonical disease classes in data/knowledge_base/agricultural_documents.json.
-"""
-
 import os
 import json
 import csv
@@ -12,10 +5,8 @@ import csv
 METADATA_CSV = "data/metadata/plantvillage_class_mapping.csv"
 OUTPUT_JSON = "data/knowledge_base/agricultural_documents.json"
 
-
 # Complete, authentic agricultural knowledge base keyed directly by canonical_id
 CANONICAL_DISEASE_KNOWLEDGE = {
-    # ── APPLE ──────────────────────────────────────────────────────────────
     "apple_apple_scab": {
         "symptoms": [
             "Olive-green to brown velvety spots on leaf upper surfaces",
@@ -126,7 +117,6 @@ CANONICAL_DISEASE_KNOWLEDGE = {
         ]
     },
 
-    # ── BLUEBERRY ──────────────────────────────────────────────────────────
     "blueberry_healthy": {
         "symptoms": [
             "Vibrant green, shiny leaves without chlorosis, spots, or marginal burn",
@@ -153,7 +143,6 @@ CANONICAL_DISEASE_KNOWLEDGE = {
         ]
     },
 
-    # ── CHERRY ─────────────────────────────────────────────────────────────
     "cherry_powdery_mildew": {
         "symptoms": [
             "White to light-grey powdery mycelial coating on young leaves and succulent shoots",
@@ -207,7 +196,6 @@ CANONICAL_DISEASE_KNOWLEDGE = {
         ]
     },
 
-    # ── CORN / MAIZE ───────────────────────────────────────────────────────
     "corn_cercospora_leaf_spot_gray_leaf_spot": {
         "symptoms": [
             "Small tan to gray rectangular lesions strictly bounded by parallel leaf veins",
@@ -318,7 +306,6 @@ CANONICAL_DISEASE_KNOWLEDGE = {
         ]
     },
 
-    # ── GRAPE ──────────────────────────────────────────────────────────────
     "grape_black_rot": {
         "symptoms": [
             "Small circular reddish-brown leaf spots with tiny black pycnidia specks arranged in rings",
@@ -431,7 +418,6 @@ CANONICAL_DISEASE_KNOWLEDGE = {
         ]
     },
 
-    # ── ORANGE / CITRUS ────────────────────────────────────────────────────
     "orange_haunglongbing_citrus_greening": {
         "symptoms": [
             "Asymmetrical blotchy mottled yellowing across leaf veins (not symmetrical like zinc deficiency)",
@@ -462,7 +448,6 @@ CANONICAL_DISEASE_KNOWLEDGE = {
         ]
     },
 
-    # ── PEACH ──────────────────────────────────────────────────────────────
     "peach_bacterial_spot": {
         "symptoms": [
             "Small, angular, water-soaked dark green/purple lesions on leaves that turn brown",
@@ -517,7 +502,6 @@ CANONICAL_DISEASE_KNOWLEDGE = {
         ]
     },
 
-    # ── PEPPER / BELL PEPPER ───────────────────────────────────────────────
     "bell_pepper_bacterial_spot": {
         "symptoms": [
             "Small water-soaked, circular to angular dark green lesions on leaves",
@@ -573,7 +557,6 @@ CANONICAL_DISEASE_KNOWLEDGE = {
         ]
     },
 
-    # ── POTATO ─────────────────────────────────────────────────────────────
     "potato_early_blight": {
         "symptoms": [
             "Dark brown to black spots with characteristic concentric rings ('target board' pattern) on older leaves",
@@ -658,7 +641,6 @@ CANONICAL_DISEASE_KNOWLEDGE = {
         ]
     },
 
-    # ── RASPBERRY ──────────────────────────────────────────────────────────
     "raspberry_healthy": {
         "symptoms": [
             "Healthy compound green leaves with serrated edges and distinct silvery undersides",
@@ -685,7 +667,6 @@ CANONICAL_DISEASE_KNOWLEDGE = {
         ]
     },
 
-    # ── SOYBEAN ────────────────────────────────────────────────────────────
     "soybean_healthy": {
         "symptoms": [
             "Trifoliate vibrant green leaves forming a dense, closed row canopy",
@@ -713,7 +694,6 @@ CANONICAL_DISEASE_KNOWLEDGE = {
         ]
     },
 
-    # ── SQUASH / CUCURBIT ──────────────────────────────────────────────────
     "squash_powdery_mildew": {
         "symptoms": [
             "White, talcum-powder-like fungal spots on upper and lower leaf surfaces, petioles, and stems",
@@ -743,7 +723,6 @@ CANONICAL_DISEASE_KNOWLEDGE = {
         ]
     },
 
-    # ── STRAWBERRY ─────────────────────────────────────────────────────────
     "strawberry_leaf_scorch": {
         "symptoms": [
             "Numerous small, irregular purple to dark red spots with dark centers on upper leaflet surface",
@@ -799,7 +778,6 @@ CANONICAL_DISEASE_KNOWLEDGE = {
         ]
     },
 
-    # ── TOMATO ─────────────────────────────────────────────────────────────
     "tomato_bacterial_spot": {
         "symptoms": [
             "Small (1/8 inch), water-soaked, dark brown to black circular lesions on leaves and stems",
@@ -1087,7 +1065,6 @@ CANONICAL_DISEASE_KNOWLEDGE = {
     }
 }
 
-
 def build_knowledge_base():
     """Generates the comprehensive agricultural knowledge base JSON file."""
     os.makedirs(os.path.dirname(OUTPUT_JSON), exist_ok=True)
@@ -1149,7 +1126,6 @@ def build_knowledge_base():
         json.dump(documents, f, indent=2)
 
     print(f"Successfully generated {len(documents)} agricultural knowledge documents at: {OUTPUT_JSON}")
-
 
 if __name__ == "__main__":
     build_knowledge_base()

@@ -1,17 +1,9 @@
-"""
-Module Interface Contracts for Plant Disease Detection.
-
-Defines typed dataclass schemas and data contracts governing inter-module 
-communication across Vision, RAG Knowledge Base, and Integration layers.
-"""
-
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from typing import List, Optional, Dict, Any
 
 
 class PredictionStatus(str, Enum):
-    """Supported prediction status categories."""
     SUPPORTED = "supported"
     UNCERTAIN = "uncertain"
     UNKNOWN = "unknown"
@@ -20,21 +12,6 @@ class PredictionStatus(str, Enum):
 
 @dataclass
 class VisionPrediction:
-    """
-    Data contract for Vision/CNN module output (Tohidur).
-    
-    Required Core Fields:
-    - plant: Crop species name (e.g., 'Tomato')
-    - disease: Disease name or 'Healthy' (e.g., 'Early Blight')
-    - canonical_id: Machine-friendly taxonomy ID (e.g., 'tomato_early_blight')
-    - confidence: Prediction confidence score [0.0, 1.0]
-    - status: Prediction status category ('supported', 'uncertain', 'unknown', 'not_a_plant')
-    
-    Optional / Future Extension Fields:
-    - raw_label: Original dataset directory label if applicable
-    - embedding: Deep visual feature vector (Optional future extension for open-set matching)
-    - model_version: Identifier for the CNN checkpoint/architecture version (e.g., 'vision_v1')
-    """
     plant: str
     disease: str
     canonical_id: str
@@ -82,9 +59,6 @@ class VisionPrediction:
 
 @dataclass
 class RAGQueryInput:
-    """
-    Data contract for Knowledge Base / RAG module input query (Saiyab).
-    """
     plant: str
     disease: str
     canonical_id: str
@@ -114,13 +88,6 @@ class RAGQueryInput:
 
 @dataclass
 class AdvisoryResult:
-    """
-    Data contract for Knowledge Base / RAG module output advisory (Saiyab).
-    
-    NOTE: All text content held in instances of this class during Phase 2 are 
-    FOR DEMONSTRATION & TESTING SCHEMA STRUCTURE ONLY. The production RAG system 
-    will populate these fields from verified, authoritative agricultural extension sources in Phase 3.
-    """
     canonical_id: str
     symptoms: List[str] = field(default_factory=list)
     causes: List[str] = field(default_factory=list)
@@ -153,10 +120,6 @@ class AdvisoryResult:
 
 @dataclass
 class IntegratedResponse:
-    """
-    Data contract for Integration Layer output (Asikul).
-    Combines VisionPrediction + AdvisoryResult into a final structured user response.
-    """
     prediction: VisionPrediction
     advisory: Optional[AdvisoryResult]
     user_message: str
@@ -174,9 +137,6 @@ class IntegratedResponse:
 
     @classmethod
     def compose(cls, prediction: VisionPrediction, advisory: Optional[AdvisoryResult] = None) -> "IntegratedResponse":
-        """
-        Combines VisionPrediction and AdvisoryResult into an IntegratedResponse object.
-        """
         warnings: List[str] = []
         evidence: List[str] = []
         sources: List[str] = []

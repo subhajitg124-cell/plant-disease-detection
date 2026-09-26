@@ -1,29 +1,3 @@
-"""
-End-to-End Pipeline & Scenario Tests for Plant Disease Detection & Advisory System.
-
-Tests cover:
-  1. Standard Disease Scenarios:
-     - Tomato Early Blight
-     - Potato Early Blight
-     - Pepper Bell Bacterial Spot
-     - Tomato Healthy
-     - Symptoms & Causes query retrieval
-     - Prevention query retrieval
-     - Treatment & Control query retrieval
-  2. Failure & Edge Cases:
-     - Missing image file path
-     - Invalid / non-plant image (rejection via foliage ratio)
-     - Corrupted image input
-     - Low-confidence prediction (safety gating)
-     - Unknown disease / out-of-distribution input
-     - Vector database query fallback
-     - Direct canonical ID lookup fallback
-  3. Response Contract Completeness:
-     - Detected plant, disease, canonical ID
-     - Symptoms, causes, risk factors, prevention, management
-     - Sources, evidence chunks, confidence score, status
-"""
-
 import os
 import sys
 import unittest
@@ -38,7 +12,6 @@ from src.contracts import (
 )
 from src.retrieval.rag_retriever import RAGRetriever
 from src.advisory.advisory_generator import AdvisoryGenerator
-
 
 class TestDiseaseQueriesRetrieval(unittest.TestCase):
     """Verifies retrieval for required domain queries."""
@@ -113,7 +86,6 @@ class TestDiseaseQueriesRetrieval(unittest.TestCase):
         for _, score in results:
             self.assertGreater(score, 0.0)
 
-
 class TestEndToEndPipelineScenarios(unittest.TestCase):
     """End-to-end tests for full pipeline execution."""
 
@@ -163,7 +135,6 @@ class TestEndToEndPipelineScenarios(unittest.TestCase):
         self.assertIn("Tomato", res.user_message)
         self.assertIn("Early blight", res.user_message)
         self.assertIn("88.0%", res.user_message)
-
 
 class TestPipelineFailureAndEdgeCases(unittest.TestCase):
     """Failure and edge cases."""
@@ -244,7 +215,6 @@ class TestPipelineFailureAndEdgeCases(unittest.TestCase):
         self.assertEqual(len(results), 3)
         self.assertEqual(results[1].status, PredictionStatus.NOT_A_PLANT.value)
         self.assertEqual(results[2].status, PredictionStatus.NOT_A_PLANT.value)
-
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

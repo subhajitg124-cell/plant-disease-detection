@@ -1,7 +1,3 @@
-"""
-Unit Tests for Visual Embedding Extraction Module.
-"""
-
 import os
 import sys
 import unittest
@@ -20,7 +16,6 @@ except ImportError:
     Image = None
 
 from src.embeddings.visual_embeddings import VisualEmbeddingExtractor
-
 
 class TestVisualEmbeddings(unittest.TestCase):
 
@@ -54,7 +49,6 @@ class TestVisualEmbeddings(unittest.TestCase):
         vecs = self.extractor.extract_batch(batch)
         self.assertEqual(len(vecs), 2)
         self.assertEqual(len(vecs[0]), 128)
-
 
 if __name__ == "__main__":
     unittest.main()

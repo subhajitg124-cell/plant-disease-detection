@@ -1,18 +1,3 @@
-"""
-Unit Tests for VectorStore and RAGRetriever Modules.
-
-Tests:
-  - Vector store indexing (dimension=256, canonical_index)
-  - Exact canonical ID lookup (O(1) and fallback)
-  - Disease-condition natural language query vector similarity
-  - Plant-specific advisory retrieval
-  - RAGRetriever exact + similarity + fallback retrieval
-  - Grounding verification
-  - Evidence chunk extraction
-  - Fallback advisory scaffold structure
-  - KB statistics
-"""
-
 import os
 import sys
 import unittest
@@ -23,10 +8,7 @@ from src.retrieval.vector_store import VectorStore
 from src.retrieval.rag_retriever import RAGRetriever
 from src.contracts import RAGQueryInput, AdvisoryResult
 
-
-# ---------------------------------------------------------------------------
 # Shared test KB documents
-# ---------------------------------------------------------------------------
 SAMPLE_DOCS = [
     {
         "canonical_id": "apple_apple_scab",
@@ -116,7 +98,6 @@ SAMPLE_DOCS = [
         )
     }
 ]
-
 
 class TestVectorStore(unittest.TestCase):
     """Tests for VectorStore indexing and retrieval."""
@@ -235,7 +216,6 @@ class TestVectorStore(unittest.TestCase):
             ids = {doc["canonical_id"] for doc in store2.documents}
             self.assertIn("apple_apple_scab", ids)
 
-
 class TestRAGRetriever(unittest.TestCase):
     """Tests for RAGRetriever retrieval paths, grounding, and evidence extraction."""
 
@@ -352,7 +332,6 @@ class TestRAGRetriever(unittest.TestCase):
         for adv in advisories:
             self.assertIsInstance(adv, AdvisoryResult)
 
-
 class TestDiseaseConditionQueries(unittest.TestCase):
     """Integration tests for realistic disease-condition query scenarios."""
 
@@ -389,7 +368,6 @@ class TestDiseaseConditionQueries(unittest.TestCase):
         # At least some healthy classes should appear
         has_healthy = any("healthy" in cid for cid in ids)
         self.assertTrue(has_healthy or len(ids) > 0)
-
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

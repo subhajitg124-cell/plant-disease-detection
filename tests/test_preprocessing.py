@@ -1,7 +1,3 @@
-"""
-Unit Tests for Image and Video Preprocessing Pipeline.
-"""
-
 import unittest
 import os
 import tempfile
@@ -14,7 +10,6 @@ from src.preprocessing.video_extractor import VideoFrameExtractor
 from src.preprocessing.pipeline import PreprocessingPipeline
 from src.preprocessing.dataset_split import DatasetSplitter
 from src.contracts import PredictionStatus
-
 
 class TestPreprocessingPipeline(unittest.TestCase):
 
@@ -85,7 +80,6 @@ class TestPreprocessingPipeline(unittest.TestCase):
         self.assertIn("val", splits)
         self.assertIn("test", splits)
         self.assertEqual(len(splits["train"]), 38 * 7)  # 70% of 10 = 7 per class
-
 
 if __name__ == "__main__":
     unittest.main()

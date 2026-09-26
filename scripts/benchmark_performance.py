@@ -1,16 +1,3 @@
-"""
-Performance Benchmarking Script for Plant Disease Detection & Advisory Pipeline.
-
-Measures:
-  1. Image preprocessing time (validation, resize, normalization, tensor conversion)
-  2. Vision CNN inference time (CPU / GPU forward pass & embedding extraction)
-  3. RAG Knowledge Base retrieval time (vector search & document mapping)
-  4. Advisory generation time (grounding verification, evidence chunking, message synthesis)
-  5. Total End-to-End Pipeline Response Time
-
-Generates summary latency tables and reports preparation for Week 8 optimization.
-"""
-
 import os
 import sys
 import time
@@ -33,27 +20,23 @@ from src.contracts import VisionPrediction, PredictionStatus
 def run_benchmarks(num_warmup: int = 10, num_iterations: int = 100) -> Dict[str, Any]:
     print("=" * 70)
     print("PLANT DISEASE DETECTION & ADVISORY SYSTEM — PERFORMANCE BENCHMARK")
-    print(f"Date: 25 September 2026 | Warmup: {num_warmup} | Iterations: {num_iterations}")
+    print(f"Warmup: {num_warmup} | Iterations: {num_iterations}")
     print("=" * 70)
 
-    # 1. Initialize components
     pipeline = PlantDiseasePipeline()
     prep = PreprocessingPipeline(target_size=(224, 224))
     classifier = pipeline.classifier
     retriever = pipeline.retriever
     generator = pipeline.generator
 
-    # Create synthetic test leaf
     leaf_arr = np.zeros((224, 224, 3), dtype=np.uint8)
     leaf_arr[:, :, 1] = 175
     leaf_arr[:, :, 0] = 35
 
-    # ── Warmup Phase ────────────────────────────────────────────────────────
     print("\nWarming up pipeline components...")
     for _ in range(num_warmup):
         _ = pipeline.predict_and_advise(leaf_arr)
 
-    # ── 1. Image Preprocessing Benchmark ──────────────────────────────────
     print("Benchmarking Preprocessing...")
     prep_times: List[float] = []
     for _ in range(num_iterations):
@@ -62,7 +45,6 @@ def run_benchmarks(num_warmup: int = 10, num_iterations: int = 100) -> Dict[str,
         t1 = time.perf_counter()
         prep_times.append((t1 - t0) * 1000.0)
 
-    # ── 2. Vision CNN Inference Benchmark ─────────────────────────────────
     print("Benchmarking Vision CNN Inference...")
     _, tensor_data, _ = prep.process_image(leaf_arr, return_tensor=True)
     vision_times: List[float] = []
@@ -72,7 +54,6 @@ def run_benchmarks(num_warmup: int = 10, num_iterations: int = 100) -> Dict[str,
         t1 = time.perf_counter()
         vision_times.append((t1 - t0) * 1000.0)
 
-    # ── 3. RAG Retrieval Benchmark ────────────────────────────────────────
     print("Benchmarking RAG Retrieval...")
     test_prediction = VisionPrediction(
         plant="Tomato",
@@ -88,7 +69,6 @@ def run_benchmarks(num_warmup: int = 10, num_iterations: int = 100) -> Dict[str,
         t1 = time.perf_counter()
         retrieval_times.append((t1 - t0) * 1000.0)
 
-    # ── 4. Advisory Generation Benchmark ──────────────────────────────────
     print("Benchmarking Advisory Generation...")
     advisory_times: List[float] = []
     for _ in range(num_iterations):
@@ -97,7 +77,6 @@ def run_benchmarks(num_warmup: int = 10, num_iterations: int = 100) -> Dict[str,
         t1 = time.perf_counter()
         advisory_times.append((t1 - t0) * 1000.0)
 
-    # ── 5. Full End-to-End Pipeline Benchmark ─────────────────────────────
     print("Benchmarking Full End-to-End Pipeline...")
     e2e_times: List[float] = []
     for _ in range(num_iterations):
@@ -129,7 +108,6 @@ def run_benchmarks(num_warmup: int = 10, num_iterations: int = 100) -> Dict[str,
         "throughput_fps": round(1000.0 / statistics.mean(e2e_times), 1)
     }
 
-    # Print Formatted Report
     print("\n" + "=" * 70)
     print("BENCHMARK RESULTS SUMMARY (Device: " + results["device"].upper() + ")")
     print("=" * 70)
@@ -154,7 +132,6 @@ def run_benchmarks(num_warmup: int = 10, num_iterations: int = 100) -> Dict[str,
     print(f"End-to-End Throughput: {results['throughput_fps']} inferences / second (FPS)")
     print("=" * 70)
 
-    # Save benchmark report to reports directory
     os.makedirs("reports", exist_ok=True)
     report_path = "reports/benchmark_report.json"
     with open(report_path, mode="w", encoding="utf-8") as f:

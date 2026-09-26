@@ -1,10 +1,3 @@
-"""
-Dataset Split Generator for Plant Disease Detection.
-
-Implements stratified train/validation/test split generation across 
-PlantVillage and external crop disease dataset metadata.
-"""
-
 import os
 import csv
 import random
@@ -12,9 +5,6 @@ from typing import List, Dict, Tuple, Optional
 
 
 class DatasetSplitter:
-    """
-    Handles stratified splitting of plant disease dataset records.
-    """
     def __init__(
         self,
         class_mapping_path: str = "data/metadata/plantvillage_class_mapping.csv",
@@ -27,7 +17,6 @@ class DatasetSplitter:
         random.seed(self.seed)
 
     def load_class_mapping(self) -> List[Dict[str, str]]:
-        """Loads class metadata records from CSV file."""
         if not os.path.exists(self.class_mapping_path):
             raise FileNotFoundError(f"Class mapping file not found at: {self.class_mapping_path}")
 
@@ -45,18 +34,6 @@ class DatasetSplitter:
         test_ratio: float = 0.15,
         samples_per_class: int = 100
     ) -> Dict[str, List[Dict[str, str]]]:
-        """
-        Generates stratified dataset samples across train, val, and test splits.
-        
-        Args:
-            train_ratio: Proportion of samples for training (default: 0.70)
-            val_ratio: Proportion of samples for validation (default: 0.15)
-            test_ratio: Proportion of samples for testing (default: 0.15)
-            samples_per_class: Number of synthetic/indexed image records per class.
-            
-        Returns:
-            Dictionary containing 'train', 'val', and 'test' lists of record dicts.
-        """
         if abs((train_ratio + val_ratio + test_ratio) - 1.0) > 1e-4:
             raise ValueError("Split ratios (train + val + test) must sum to 1.0")
 
@@ -74,7 +51,6 @@ class DatasetSplitter:
             num_val = int(samples_per_class * val_ratio)
             num_test = samples_per_class - num_train - num_val
 
-            # Generate structured records per class
             for i in range(samples_per_class):
                 sample_id = f"{canonical_id}_{i:04d}.jpg"
                 if i < num_train:
@@ -101,7 +77,6 @@ class DatasetSplitter:
         self,
         splits: Dict[str, List[Dict[str, str]]]
     ) -> Dict[str, str]:
-        """Saves dataset split records to CSV files in output_dir."""
         os.makedirs(self.output_dir, exist_ok=True)
         saved_files = {}
 

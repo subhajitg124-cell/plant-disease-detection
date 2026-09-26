@@ -1,20 +1,3 @@
-"""
-End-to-End Pipeline Integration Tests.
-
-Tests the complete Image → Vision → RAG → Advisory pipeline via PlantDiseasePipeline
-and verifies each integration touchpoint:
-
-  1. Valid plant image → VisionPrediction → IntegratedResponse
-  2. Non-plant image → NOT_A_PLANT rejection → no advisory
-  3. Direct KB advisory by canonical ID
-  4. Natural language KB query
-  5. Vision-only classification (no RAG)
-  6. Batch pipeline execution
-  7. VisionPrediction → AdvisoryResult grounding check
-  8. Pipeline diagnostics / component info
-  9. IntegratedResponse contract validation
-"""
-
 import os
 import sys
 import unittest
@@ -30,10 +13,7 @@ from src.contracts import (
 from src.advisory.advisory_generator import AdvisoryGenerator
 from src.retrieval.rag_retriever import RAGRetriever
 
-
-# ---------------------------------------------------------------------------
 # Synthetic image fixtures
-# ---------------------------------------------------------------------------
 
 def make_green_leaf(h: int = 224, w: int = 224) -> np.ndarray:
     """Simulates a healthy-looking green leaf input."""
@@ -42,7 +22,6 @@ def make_green_leaf(h: int = 224, w: int = 224) -> np.ndarray:
     arr[:, :, 1] = 170  # G
     arr[:, :, 2] = 25   # B
     return arr
-
 
 def make_brown_spotted_leaf(h: int = 224, w: int = 224) -> np.ndarray:
     """Simulates a brown-spotted diseased leaf."""
@@ -54,15 +33,11 @@ def make_brown_spotted_leaf(h: int = 224, w: int = 224) -> np.ndarray:
     arr[80:140, 80:140, :] = [40, 25, 10]
     return arr
 
-
 def make_non_plant(h: int = 224, w: int = 224) -> np.ndarray:
     """Simulates a uniform grey non-plant image."""
     return np.full((h, w, 3), 100, dtype=np.uint8)
 
-
-# ---------------------------------------------------------------------------
 # Test classes
-# ---------------------------------------------------------------------------
 
 class TestPipelineInitialisation(unittest.TestCase):
     """Tests that the pipeline initialises correctly with all components loaded."""
@@ -86,7 +61,6 @@ class TestPipelineInitialisation(unittest.TestCase):
         """Knowledge base should have at least 38 indexed documents."""
         info = self.pipeline.get_pipeline_info()
         self.assertGreaterEqual(info["knowledge_base"]["total_documents"], 38)
-
 
 class TestVisionOnlyPipeline(unittest.TestCase):
     """Tests for vision-only classification path (no RAG)."""
@@ -119,7 +93,6 @@ class TestVisionOnlyPipeline(unittest.TestCase):
         pred = self.pipeline.classify_only(make_green_leaf())
         self.assertGreaterEqual(pred.confidence, 0.0)
         self.assertLessEqual(pred.confidence, 1.0)
-
 
 class TestFullPipelineIntegration(unittest.TestCase):
     """End-to-end pipeline integration tests."""
@@ -216,7 +189,6 @@ class TestFullPipelineIntegration(unittest.TestCase):
         finally:
             os.unlink(tmp_name)
 
-
 class TestKnowledgeBaseQueryPipeline(unittest.TestCase):
     """Tests for direct KB query and advisory shortcut paths."""
 
@@ -283,7 +255,6 @@ class TestKnowledgeBaseQueryPipeline(unittest.TestCase):
         for hit in results:
             self.assertGreater(hit["similarity_score"], 0.0)
 
-
 class TestBatchPipeline(unittest.TestCase):
     """Tests for batch prediction pipeline."""
 
@@ -305,7 +276,6 @@ class TestBatchPipeline(unittest.TestCase):
             PredictionStatus.SUPPORTED.value,
             PredictionStatus.UNCERTAIN.value
         ])
-
 
 class TestContractValidation(unittest.TestCase):
     """Validates that pipeline outputs conform to data contracts."""
@@ -350,7 +320,6 @@ class TestContractValidation(unittest.TestCase):
             self.assertIsInstance(adv.prevention, list)
             self.assertIsInstance(adv.management, list)
             self.assertIsInstance(adv.sources, list)
-
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -69,6 +69,5 @@ class TestTaxonomyMapping(unittest.TestCase):
         total_images = sum(int(r["image_count"]) for r in rows)
         self.assertEqual(total_images, 54305, f"Expected 54,305 total images, got {total_images}")
 
-
 if __name__ == "__main__":
     unittest.main()

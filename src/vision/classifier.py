@@ -1,11 +1,6 @@
-"""
-Plant Disease Classifier Inference Engine.
-"""
-
 import os
 import sys
 
-# Ensure root workspace directory is in sys.path
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
@@ -36,9 +31,6 @@ except ImportError:
 
 
 class PlantDiseaseClassifier:
-    """
-    High-level Classifier for Plant Disease Vision System.
-    """
     def __init__(
         self,
         model_path: Optional[str] = "models/plant_disease_cnn.pth",
@@ -58,19 +50,13 @@ class PlantDiseaseClassifier:
         else:
             self.device = "cpu"
 
-        # Load taxonomy mapping
         self.class_map = self._load_class_mapping()
         self.num_classes = max(len(self.class_map), 38)
-
-        # Preprocessing pipeline
         self.pipeline = PreprocessingPipeline(target_size=(224, 224))
-
-        # Model instance
         self.model = None
         self._init_model()
 
     def _load_class_mapping(self) -> Dict[int, Dict[str, str]]:
-        """Loads class ID mapping from CSV."""
         mapping = {}
         if os.path.exists(self.class_mapping_path):
             with open(self.class_mapping_path, mode="r", encoding="utf-8") as f:
@@ -94,7 +80,6 @@ class PlantDiseaseClassifier:
         return mapping
 
     def _init_model(self):
-        """Initializes PyTorch CNN model and loads checkpoint if available."""
         if not HAS_TORCH:
             return
 
@@ -115,10 +100,6 @@ class PlantDiseaseClassifier:
         input_source: Union[str, Image.Image, np.ndarray, Any],
         extract_embedding: bool = True
     ) -> VisionPrediction:
-        """
-        Runs prediction on image input and returns a VisionPrediction contract object.
-        """
-        # 1. Preprocessing & Input Plant Validation
         is_valid, data, meta = self.pipeline.process_image(input_source, return_tensor=True)
 
         if not is_valid or meta.get("status") == PredictionStatus.NOT_A_PLANT.value:
@@ -133,16 +114,15 @@ class PlantDiseaseClassifier:
                 model_version="vision_v1"
             )
 
-        # 2. Vision Inference
         if HAS_TORCH and isinstance(data, torch.Tensor):
             if data.ndim == 3:
                 data = data.unsqueeze(0)
             data = data.to(self.device)
 
-            with torch.no_grad():  # type: ignore[attr-defined]
+            with torch.no_grad():
                 assert self.model is not None
-                logits, emb_tensor = self.model(data)  # type: ignore[operator]
-                probs = F.softmax(logits, dim=1).cpu().numpy()[0]  # type: ignore[attr-defined]
+                logits, emb_tensor = self.model(data)
+                probs = F.softmax(logits, dim=1).cpu().numpy()[0]
                 embedding_list = emb_tensor.cpu().numpy()[0].tolist() if extract_embedding else None
         else:
             arr = np.array(data) if not isinstance(data, np.ndarray) else data

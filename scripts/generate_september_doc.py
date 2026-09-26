@@ -1,8 +1,3 @@
-"""
-Generates a professionally styled Microsoft Word (.docx) document
-for the September Work Process Report.
-"""
-
 import os
 import docx
 from docx import Document
@@ -12,13 +7,11 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import parse_xml, OxmlElement
 from docx.oxml.ns import nsdecls, qn
 
-
 def set_cell_background(cell, fill_hex):
     """Sets background color of a table cell."""
     tcPr = cell._element.get_or_add_tcPr()
     shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{fill_hex}"/>')
     tcPr.append(shd)
-
 
 def set_cell_margins(cell, top=100, bottom=100, left=150, right=150):
     """Sets cell padding in dxa (1 pt = 20 dxa)."""
@@ -32,7 +25,6 @@ def set_cell_margins(cell, top=100, bottom=100, left=150, right=150):
         f'</w:tcMar>'
     )
     tcPr.append(tcMar)
-
 
 def build_september_docx(output_path: str = "docs/September_Work_Process_Report.docx"):
     doc = Document()
@@ -139,7 +131,6 @@ def build_september_docx(output_path: str = "docs/September_Work_Process_Report.
         r.font.color.rgb = TEXT_DARK
         return p
 
-    # 1. Executive Summary
     add_custom_heading("1. Executive Summary", level=1)
     add_body(
         "During September 2026, the project successfully designed, implemented, and verified the complete "
@@ -148,7 +139,6 @@ def build_september_docx(output_path: str = "docs/September_Work_Process_Report.
         "Domain-Structured Semantic Vector Index (RAG) and authoritative Extension Knowledge Bases (USDA-ARS, UC IPM, Cornell, Penn State, UF/IFAS)."
     )
 
-    # 2. September Roadmap Audit Table
     add_custom_heading("2. September Roadmap Audit", level=1)
     
     headers = ["Week", "Milestone Goal", "Status", "Key Deliverables & Changes"]
@@ -197,7 +187,6 @@ def build_september_docx(output_path: str = "docs/September_Work_Process_Report.
 
     doc.add_paragraph().paragraph_format.space_after = Pt(10)
 
-    # 3. Key Technical Implementations
     add_custom_heading("3. Detailed Technical Implementations", level=1)
 
     # Week 5
@@ -224,7 +213,6 @@ def build_september_docx(output_path: str = "docs/September_Work_Process_Report.
     add_bullet(" Full execution path: Image -> Validation -> Preprocessing -> CNN -> VisionPrediction -> RAGRetriever -> AdvisoryGenerator -> IntegratedResponse.", "Unified Integration Pipeline:")
     add_bullet(" Low-confidence scores (<0.60) reclassified as UNCERTAIN; out-of-distribution pathologies safely routed to UNKNOWN.", "Safety Guardrails:")
 
-    # 4. Performance Benchmarks
     add_custom_heading("4. Performance Benchmarking Results", level=1)
     add_body("Benchmarking was conducted across 100 iterations on standard CPU hardware:")
 
@@ -272,7 +260,6 @@ def build_september_docx(output_path: str = "docs/September_Work_Process_Report.
     doc.add_paragraph().paragraph_format.space_after = Pt(6)
     add_body("Throughput: 88.7 inferences / second (FPS) on CPU.")
 
-    # 5. Verification & Test Suite
     add_custom_heading("5. Test Suite Verification", level=1)
     add_body(
         "A total of 133 automated unit and integration tests across 10 test modules were executed and verified passing (100% pass rate in ~9.5 seconds):"
@@ -285,7 +272,6 @@ def build_september_docx(output_path: str = "docs/September_Work_Process_Report.
     add_bullet(" 12 tests verifying image transforms, dimension limits, and HSV foliage checks.", "test_preprocessing.py:")
     add_bullet(" 23 tests verifying CNN architectures, contracts, embeddings, and evaluation metrics.", "Other Modules:")
 
-    # 6. Conclusion
     add_custom_heading("6. Conclusion & Week 8 Readiness", level=1)
     add_body(
         "The September milestones (Weeks 5, 6, and 7) have been fully delivered, verified, and stabilized. "
@@ -296,7 +282,6 @@ def build_september_docx(output_path: str = "docs/September_Work_Process_Report.
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     doc.save(output_path)
     print(f"Successfully generated formatted Word document at: {output_path}")
-
 
 if __name__ == "__main__":
     build_september_docx()

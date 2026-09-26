@@ -1,10 +1,3 @@
-"""
-Model Evaluator and Report Generation Module.
-
-Evaluates PlantDiseaseClassifier across dataset split records and generates
-structured JSON and Markdown baseline performance reports in reports/.
-"""
-
 import os
 import sys
 import json
@@ -32,9 +25,6 @@ except ImportError:
 
 
 class ModelEvaluator:
-    """
-    Evaluation Engine for Plant Disease Vision System.
-    """
     def __init__(
         self,
         classifier: Optional[PlantDiseaseClassifier] = None,
@@ -48,9 +38,6 @@ class ModelEvaluator:
         self,
         split_csv_path: str = "data/processed/val.csv"
     ) -> Dict[str, Any]:
-        """
-        Evaluates predictions against ground truth labels from dataset split CSV.
-        """
         if not os.path.exists(split_csv_path):
             try:
                 from src.preprocessing.dataset_split import DatasetSplitter
@@ -80,10 +67,9 @@ class ModelEvaluator:
             true_cid = int(rec["class_id"])
             y_true.append(true_cid)
 
-            # Generate evaluation image tensor per class
             img_arr = np.zeros((224, 224, 3), dtype=np.uint8)
-            img_arr[:, :, 1] = 160 + (true_cid * 2) % 90  # Green leaf tone
-            img_arr[30:70, 30:70, 0] = 110 + (true_cid * 3) % 130  # Disease spot
+            img_arr[:, :, 1] = 160 + (true_cid * 2) % 90
+            img_arr[30:70, 30:70, 0] = 110 + (true_cid * 3) % 130
 
             if has_model:
                 try:
@@ -110,7 +96,6 @@ class ModelEvaluator:
         y_probs_arr = np.array(y_probs)
         metrics = calculate_metrics(y_true, y_pred, y_probs=y_probs_arr, num_classes=38)
         
-        # Calculate error analysis statistics
         error_count = sum(1 for t, p in zip(y_true, y_pred) if t != p)
         metrics["error_count"] = error_count
         metrics["error_rate"] = float(error_count / len(y_true)) if len(y_true) > 0 else 0.0
@@ -123,13 +108,9 @@ class ModelEvaluator:
         json_filename: str = "baseline_validation_report.json",
         md_filename: str = "baseline_performance_report.md"
     ) -> Tuple[str, str]:
-        """
-        Saves structured JSON and human-readable Markdown evaluation reports.
-        """
         json_path = os.path.join(self.reports_dir, json_filename)
         md_path = os.path.join(self.reports_dir, md_filename)
 
-        # 1. Save JSON Report
         report_data = {
             "model_version": "vision_v1",
             "model_path": "models/plant_disease_cnn.pth",
@@ -139,7 +120,6 @@ class ModelEvaluator:
         with open(json_path, mode="w", encoding="utf-8") as f:
             json.dump(report_data, f, indent=2)
 
-        # 2. Save Markdown Report
         md_content = f"""# Plant Disease Vision Model — Baseline Performance Report
 
 ## Summary & Overview
@@ -188,4 +168,3 @@ if __name__ == "__main__":
     metrics = evaluator.evaluate_split_csv("data/processed/val.csv")
     json_path, md_path = evaluator.generate_and_save_reports(metrics)
     print(f"Reports successfully generated:\n - {json_path}\n - {md_path}")
-

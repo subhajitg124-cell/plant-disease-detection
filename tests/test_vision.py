@@ -1,7 +1,3 @@
-"""
-Unit Tests for Vision Module and PlantDiseaseClassifier.
-"""
-
 import os
 import sys
 
@@ -17,7 +13,6 @@ from src.vision.model import PlantDiseaseCNN
 from src.vision.classifier import PlantDiseaseClassifier
 from src.vision.train import train_model
 from src.contracts import VisionPrediction, PredictionStatus
-
 
 class TestVisionModule(unittest.TestCase):
 
@@ -59,7 +54,6 @@ class TestVisionModule(unittest.TestCase):
         result = train_model(epochs=1, batch_size=8)
         self.assertEqual(result["status"], "success")
         self.assertTrue(os.path.exists("models/plant_disease_cnn.pth"))
-
 
 if __name__ == "__main__":
     unittest.main()

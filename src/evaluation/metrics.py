@@ -1,10 +1,3 @@
-"""
-Classification Metrics Calculator.
-
-Computes Accuracy, Macro/Weighted Precision, Recall, F1-Scores, Top-k Accuracy,
-and Confusion Matrix statistics.
-"""
-
 from typing import List, Dict, Any, Union, Tuple, Optional
 import numpy as np
 
@@ -16,14 +9,12 @@ except ImportError:
 
 
 class ConfusionMatrix:
-    """Computes and formats confusion matrix representation."""
     def __init__(self, y_true: List[int], y_pred: List[int], num_classes: int = 38):
         self.y_true = np.array(y_true, dtype=np.int64)
         self.y_pred = np.array(y_pred, dtype=np.int64)
         self.num_classes = num_classes
 
     def compute(self) -> np.ndarray:
-        """Returns 2D confusion matrix array of shape (num_classes, num_classes)."""
         if HAS_SKLEARN:
             labels = list(range(self.num_classes))
             return confusion_matrix(self.y_true, self.y_pred, labels=labels)
@@ -36,7 +27,6 @@ class ConfusionMatrix:
 
 
 def calculate_topk_accuracy(y_true: List[int], y_probs: np.ndarray, k: int = 3) -> float:
-    """Calculates Top-k classification accuracy."""
     y_true_arr = np.array(y_true)
     topk_preds = np.argsort(y_probs, axis=1)[:, -k:]
     correct = 0
@@ -52,9 +42,6 @@ def calculate_metrics(
     y_probs: Optional[np.ndarray] = None,
     num_classes: int = 38
 ) -> Dict[str, Any]:
-    """
-    Calculates overall evaluation metrics for plant disease predictions.
-    """
     y_true_arr = np.array(y_true, dtype=np.int64)
     y_pred_arr = np.array(y_pred, dtype=np.int64)
 
@@ -67,7 +54,6 @@ def calculate_metrics(
             y_true_arr, y_pred_arr, average="weighted", zero_division=0
         )
     else:
-        # Fallback pure numpy metric calculation
         correct = np.sum(y_true_arr == y_pred_arr)
         acc = float(correct / len(y_true_arr)) if len(y_true_arr) > 0 else 0.0
         p_macro, r_macro, f1_macro = acc, acc, acc

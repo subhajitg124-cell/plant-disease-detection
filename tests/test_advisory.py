@@ -1,19 +1,3 @@
-"""
-Unit Tests for AdvisoryGenerator Module.
-
-Tests:
-  - Full advisory generation for supported predictions (grounding verification)
-  - Advisory message synthesis includes all key fields
-  - Evidence chunks populated from retrieved KB documents
-  - Sources populated from retrieved KB documents
-  - Low-confidence / uncertain prediction suppression
-  - Non-plant input rejection
-  - Unknown disease out-of-distribution suppression
-  - Batch advisory generation
-  - Advisory report formatting
-  - Grounding quality check integration
-"""
-
 import os
 import sys
 import unittest
@@ -23,14 +7,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from src.contracts import VisionPrediction, PredictionStatus, IntegratedResponse, AdvisoryResult
 from src.advisory.advisory_generator import AdvisoryGenerator
 
-
 class TestAdvisoryGeneratorGrounding(unittest.TestCase):
     """Core grounding and advisory generation tests."""
 
     def setUp(self):
         self.generator = AdvisoryGenerator()
-
-    # ── Supported predictions ──────────────────────────────────────────────
 
     def test_supported_prediction_returns_integrated_response(self):
         """Supported prediction should return a fully-populated IntegratedResponse."""
@@ -129,8 +110,6 @@ class TestAdvisoryGeneratorGrounding(unittest.TestCase):
         ]
         self.assertEqual(len(suppression_warnings), 0)
 
-    # ── Confidence grounding check ─────────────────────────────────────────
-
     def test_confidence_in_response_matches_prediction(self):
         """Response confidence should match the prediction confidence."""
         pred = VisionPrediction(
@@ -140,8 +119,6 @@ class TestAdvisoryGeneratorGrounding(unittest.TestCase):
         )
         res = self.generator.generate_advisory(pred)
         self.assertAlmostEqual(res.confidence, 0.78, places=5)
-
-    # ── Safety guardrails ──────────────────────────────────────────────────
 
     def test_uncertain_prediction_advisory_suppressed(self):
         """Low-confidence predictions should suppress the advisory."""
@@ -232,8 +209,6 @@ class TestAdvisoryGeneratorGrounding(unittest.TestCase):
         res = self.generator.generate_advisory(pred)
         self.assertGreater(len(res.warnings), 0)
 
-    # ── Batch generation ───────────────────────────────────────────────────
-
     def test_batch_generation(self):
         """Batch generation should return one response per input prediction."""
         preds = [
@@ -252,8 +227,6 @@ class TestAdvisoryGeneratorGrounding(unittest.TestCase):
         self.assertIsNotNone(responses[0].advisory)   # supported
         self.assertIsNotNone(responses[1].advisory)   # supported
         self.assertIsNone(responses[2].advisory)      # not_a_plant
-
-    # ── Report formatting ──────────────────────────────────────────────────
 
     def test_format_advisory_report_structure(self):
         """Formatted report should contain key section headers."""
@@ -277,7 +250,6 @@ class TestAdvisoryGeneratorGrounding(unittest.TestCase):
         res = self.generator.generate_advisory(pred)
         report = self.generator.format_advisory_report(res)
         self.assertIn("Apple", report)
-
 
 class TestAdvisoryGroundingIntegration(unittest.TestCase):
     """Integration-level grounding verification tests."""
@@ -309,7 +281,6 @@ class TestAdvisoryGroundingIntegration(unittest.TestCase):
                     len(res.sources), 0,
                     f"No sources for {cid}"
                 )
-
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

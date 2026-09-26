@@ -1,11 +1,3 @@
-"""
-Vector Store and Similarity Index Module.
-
-Supports FAISS, ChromaDB, and NumPy cosine similarity indexing
-for fast agricultural document retrieval via canonical ID or
-natural language disease-condition queries.
-"""
-
 import os
 import sys
 import json
@@ -14,7 +6,6 @@ import re
 from typing import List, Dict, Any, Optional, Tuple, Union
 import numpy as np
 
-# Ensure root directory is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 HAS_FAISS = False
@@ -32,9 +23,6 @@ except ImportError:
     HAS_CHROMADB = False
 
 
-# ---------------------------------------------------------------------------
-# Structured domain slot mappings for high-precision 256-dimensional embeddings
-# ---------------------------------------------------------------------------
 _PLANT_SLOTS = {
     'apple': 0, 'tomato': 1, 'potato': 2, 'grape': 3, 'corn': 4, 'maize': 4,
     'cherry': 5, 'peach': 6, 'pepper': 7, 'squash': 8, 'strawberry': 9,
@@ -83,17 +71,6 @@ _CONDITION_SLOTS = {
 
 
 class VectorStore:
-    """
-    Unified Vector Store and Similarity Indexing Engine.
-
-    Supports:
-    - Exact canonical ID lookup via hash map
-    - Structured semantic domain-slot text-to-vector encoding
-    - FAISS (if available) or NumPy cosine fallback for top-k similarity search
-    - ChromaDB persistence (if available)
-    - Disease-condition natural language query support
-    """
-
     def __init__(self, dimension: int = 256, store_dir: str = "models/vector_index"):
         self.dimension = dimension
         self.store_dir = store_dir
@@ -101,16 +78,12 @@ class VectorStore:
 
         self.documents: List[Dict[str, Any]] = []
         self.embeddings: List[np.ndarray] = []
-
-        # Fast canonical_id → document index lookup
         self._canonical_index: Dict[str, int] = {}
 
-        # FAISS index initialization
         self.faiss_index = None
         if HAS_FAISS:
             self.faiss_index = faiss.IndexFlatIP(dimension)
 
-        # ChromaDB client initialization
         self.chroma_client = None
         self.chroma_collection = None
         if HAS_CHROMADB:
@@ -126,22 +99,10 @@ class VectorStore:
                 self.chroma_client = None
                 self.chroma_collection = None
 
-    # -----------------------------------------------------------------------
-    # Text Vectorisation
-    # -----------------------------------------------------------------------
-
     def _tokenize(self, text: str) -> List[str]:
-        """Tokenises text into lowercase alpha-numeric tokens."""
         return re.findall(r"[a-z0-9]+", text.lower())
 
     def _text_to_vector(self, text: str) -> np.ndarray:
-        """
-        Generates a domain-boosted, L2-normalised semantic embedding vector.
-
-        Strategy: Structured domain slot allocation for high discriminability
-        between plant species, pathologies, symptoms, conditions, and treatments,
-        with a general polynomial hash dispersion range for vocabulary tail tokens.
-        """
         vec = np.zeros(self.dimension, dtype=np.float32)
         tokens = self._tokenize(text)
         if not tokens:
@@ -150,43 +111,36 @@ class VectorStore:
         for idx, token in enumerate(tokens):
             pos_weight = 1.0 / (1.0 + 0.02 * idx)
 
-            # 1. Plant species domain slot
             if token in _PLANT_SLOTS:
                 slot = _PLANT_SLOTS[token]
                 if slot < self.dimension:
                     vec[slot] += 4.0 * pos_weight
 
-            # 2. Disease taxonomy slot
             if token in _DISEASE_SLOTS:
                 slot = _DISEASE_SLOTS[token]
                 if slot < self.dimension:
                     vec[slot] += 3.5 * pos_weight
 
-            # 3. Health status slot
             if token in _STATUS_SLOTS:
                 slot = _STATUS_SLOTS[token]
                 if slot < self.dimension:
                     vec[slot] += 3.0 * pos_weight
 
-            # 4. Symptom characteristic slot
             if token in _SYMPTOM_SLOTS:
                 slot = _SYMPTOM_SLOTS[token]
                 if slot < self.dimension:
                     vec[slot] += 2.5 * pos_weight
 
-            # 5. Treatment / control chemical slot
             if token in _TREATMENT_SLOTS:
                 slot = _TREATMENT_SLOTS[token]
                 if slot < self.dimension:
                     vec[slot] += 2.0 * pos_weight
 
-            # 6. Environmental / cultural condition slot
             if token in _CONDITION_SLOTS:
                 slot = _CONDITION_SLOTS[token]
                 if slot < self.dimension:
                     vec[slot] += 1.5 * pos_weight
 
-            # 7. Bigram signal for consecutive tokens
             if idx > 0:
                 prev = tokens[idx - 1]
                 bigram = f"{prev}_{token}"
@@ -203,7 +157,6 @@ class VectorStore:
                     if slot < self.dimension:
                         vec[slot] += 3.0 * pos_weight
 
-            # 8. General polynomial hash dispersion bucket (slots 200..255)
             h = 5381
             for c in token:
                 h = (((h << 5) + h) + ord(c)) & 0xFFFFFFFF
@@ -216,30 +169,18 @@ class VectorStore:
             vec = vec / norm
         return vec
 
-    # -----------------------------------------------------------------------
-    # Indexing
-    # -----------------------------------------------------------------------
-
     def add_documents(
         self,
         docs: List[Dict[str, Any]],
         vectors: Optional[List[List[float]]] = None
     ):
-        """
-        Indexes a list of agricultural knowledge base documents.
-
-        For each document, builds a rich search_text from all available fields
-        if not already present, then generates and stores its embedding.
-        """
         for i, doc in enumerate(docs):
             if vectors is not None and i < len(vectors):
                 vec = np.array(vectors[i], dtype=np.float32)
             else:
-                # Build or use existing search_text
                 search_text = doc.get("search_text") or self._build_search_text(doc)
                 vec = self._text_to_vector(search_text)
 
-            # L2 normalise
             norm = np.linalg.norm(vec)
             if norm > 0:
                 vec = vec / norm
@@ -251,11 +192,9 @@ class VectorStore:
             self.embeddings.append(vec)
             self._canonical_index[canonical_id] = doc_idx
 
-            # Index into FAISS
             if HAS_FAISS and self.faiss_index is not None:
                 self.faiss_index.add(np.array([vec], dtype=np.float32))
 
-            # Index into ChromaDB
             if self.chroma_collection is not None:
                 try:
                     self.chroma_collection.upsert(
@@ -272,7 +211,6 @@ class VectorStore:
                     pass
 
     def _build_search_text(self, doc: Dict[str, Any]) -> str:
-        """Constructs a rich search text string from document fields."""
         plant = doc.get("plant", "")
         disease = doc.get("disease", "")
         cid = doc.get("canonical_id", "")
@@ -288,18 +226,9 @@ class VectorStore:
 
         return " ".join(parts)
 
-    # -----------------------------------------------------------------------
-    # Search
-    # -----------------------------------------------------------------------
-
     def search_by_vector(
         self, query_vector: Union[List[float], np.ndarray], top_k: int = 5
     ) -> List[Tuple[Dict[str, Any], float]]:
-        """
-        Searches index by vector embedding.
-
-        Returns: list of (document, similarity_score) tuples sorted desc by score.
-        """
         if not self.embeddings:
             return []
 
@@ -308,7 +237,6 @@ class VectorStore:
         if norm > 0:
             q_vec = q_vec / norm
 
-        # FAISS path
         if HAS_FAISS and self.faiss_index is not None and self.faiss_index.ntotal > 0:
             k = min(top_k, self.faiss_index.ntotal)
             scores, indices = self.faiss_index.search(
@@ -320,7 +248,6 @@ class VectorStore:
                     results.append((self.documents[idx], float(score)))
             return results
 
-        # NumPy cosine fallback
         emb_matrix = np.array(self.embeddings, dtype=np.float32)
         sims = np.dot(emb_matrix, q_vec)
         k = min(top_k, len(self.documents))
@@ -331,16 +258,6 @@ class VectorStore:
     def search_by_query(
         self, query_text: str, top_k: int = 5, min_score: float = 0.0
     ) -> List[Tuple[Dict[str, Any], float]]:
-        """
-        Searches index by natural language disease/condition query string.
-
-        Supports queries like:
-        - "apple scab leaf spots"
-        - "tomato early blight concentric rings management"
-        - "humid conditions fungal spray prevention"
-
-        Returns: list of (document, score) tuples filtered by min_score.
-        """
         q_vec = self._text_to_vector(query_text)
         results = self.search_by_vector(q_vec, top_k=top_k)
         if min_score > 0.0:
@@ -348,13 +265,9 @@ class VectorStore:
         return results
 
     def search_by_canonical_id(self, canonical_id: str) -> Optional[Dict[str, Any]]:
-        """
-        O(1) exact-match lookup for document by canonical disease ID.
-        """
         idx = self._canonical_index.get(canonical_id)
         if idx is not None:
             return self.documents[idx]
-        # Linear fallback for safety
         for doc in self.documents:
             if doc.get("canonical_id") == canonical_id:
                 return doc
@@ -363,21 +276,13 @@ class VectorStore:
     def search_by_plant(
         self, plant_name: str, top_k: int = 10
     ) -> List[Dict[str, Any]]:
-        """
-        Returns all documents for a given plant species (case-insensitive).
-        """
         name = plant_name.strip().lower()
         return [
             doc for doc in self.documents
             if doc.get("plant", "").lower() == name
         ][:top_k]
 
-    # -----------------------------------------------------------------------
-    # Persistence
-    # -----------------------------------------------------------------------
-
     def save_index(self, path: Optional[str] = None) -> str:
-        """Saves documents and embeddings to disk."""
         target_path = path or os.path.join(self.store_dir, "vector_store.npz")
         docs_path = os.path.join(self.store_dir, "vector_documents.json")
         index_path = os.path.join(self.store_dir, "canonical_index.json")
@@ -398,12 +303,6 @@ class VectorStore:
         return target_path
 
     def load_index(self, path: Optional[str] = None) -> bool:
-        """Loads saved index from disk.
-
-        Returns False (without crashing) if the stored embeddings have a
-        different dimension than the current VectorStore, so the caller
-        can rebuild the index from source data.
-        """
         target_path = path or os.path.join(self.store_dir, "vector_store.npz")
         docs_path = os.path.join(self.store_dir, "vector_documents.json")
         index_path = os.path.join(self.store_dir, "canonical_index.json")
@@ -414,7 +313,6 @@ class VectorStore:
         data = np.load(target_path)
         loaded_embeddings = data["embeddings"]
 
-        # ── Dimension mismatch guard ──────────────────────────────────────
         if loaded_embeddings.ndim == 2 and loaded_embeddings.shape[1] != self.dimension:
             print(
                 f"Warning: Stored index dimension ({loaded_embeddings.shape[1]}) "
@@ -431,7 +329,6 @@ class VectorStore:
                 raw = json.load(f)
                 self._canonical_index = {k: int(v) for k, v in raw.items()}
         else:
-            # Rebuild canonical index from documents
             self._canonical_index = {
                 str(doc.get("canonical_id", f"doc_{i}")): i
                 for i, doc in enumerate(self.documents)
@@ -446,7 +343,6 @@ class VectorStore:
         return True
 
     def get_stats(self) -> Dict[str, Any]:
-        """Returns statistics about the current index."""
         return {
             "total_documents": len(self.documents),
             "dimension": self.dimension,
@@ -468,7 +364,6 @@ if __name__ == "__main__":
         stats = store.get_stats()
         print(f"Indexed {stats['total_documents']} documents | {stats['unique_plants']} plants | dim={stats['dimension']}")
 
-        # Quick similarity query test
         results = store.search_by_query("apple scab olive spots fungal prevention", top_k=3)
         for doc, score in results:
             print(f"  [{score:.4f}] {doc['canonical_id']} — {doc['plant']} / {doc['disease']}")
