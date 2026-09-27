@@ -217,3 +217,20 @@ plant-disease-detection/
 │   └── vision/                 # PlantDiseaseCNN model & classifier
 └── tests/                      # 133 automated unit and integration tests
 ```
+
+
+## 9. Leaf Screening Website
+
+A browser-based upload experience is available in `app.py`. It uses a public 38-class PlantVillage Vision Transformer for image screening and this repository's agricultural knowledge base for care guidance. Install the separate web dependencies and launch it with:
+
+```powershell
+py -m venv .venv
+.\\.venv\\Scripts\\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements-web.txt
+streamlit run app.py
+```
+
+The first launch downloads the model from Hugging Face (no API key required) and caches it locally. See [the web app guide](docs/web-app.md) for setup and hosting details. Review the [model card and CC BY-SA 3.0 license](https://huggingface.co/kimcomehome/plantvillage-vit-leaf-disease) before redistributing model-backed deployments.
+
+The model is a screening aid trained on detached leaves photographed in controlled conditions. It is not a whole-tree detector or a confirmed diagnosis. The image overlay is an attention estimate, not a lesion segmentation mask, and model scores are not calibrated probabilities. Confirm consequential treatment decisions with a local agricultural extension specialist.
