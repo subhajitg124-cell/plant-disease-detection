@@ -218,14 +218,13 @@ plant-disease-detection/
 └── tests/                      # 133 automated unit and integration tests
 ```
 
-
 ## 9. Leaf Screening Website
 
 A browser-based upload experience is available in `app.py`. It uses a public 38-class PlantVillage Vision Transformer for image screening and this repository's agricultural knowledge base for care guidance. Install the separate web dependencies and launch it with:
 
 ```powershell
 py -m venv .venv
-.\\.venv\\Scripts\\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r requirements-web.txt
 streamlit run app.py
