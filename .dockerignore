@@ -1,0 +1,13 @@
+.git
+.venv
+venv
+__pycache__
+*.py[cod]
+*.ipynb
+tests
+data/raw
+data/processed
+data/external
+models/*.pth
+models/*.pt
+
