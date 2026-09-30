@@ -169,6 +169,13 @@ class VectorStore:
             vec = vec / norm
         return vec
 
+    def add_document(
+        self,
+        doc: Dict[str, Any],
+        vector: Optional[List[float]] = None
+    ):
+        self.add_documents([doc], [vector] if vector is not None else None)
+
     def add_documents(
         self,
         docs: List[Dict[str, Any]],

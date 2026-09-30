@@ -1,0 +1,63 @@
+{
+  "baseline_version": "1.0.0-frozen-baseline",
+  "frozen_at": "2026-09-30T13:55:35Z",
+  "notes": "Baseline frozen for unseen dataset evaluation",
+  "hyperparameters": {
+    "input_resolution": [
+      224,
+      224
+    ],
+    "confidence_threshold": 0.6,
+    "foliage_greenness_threshold": 0.05,
+    "embedding_dimension": 128,
+    "vector_store_dimension": 256,
+    "num_canonical_classes": 38
+  },
+  "components": {
+    "models/plant_disease_cnn.pth": {
+      "exists": true,
+      "size_bytes": 1726882,
+      "sha256": "662ac6aee39156d5af2618f2914327277691afc91a1727dc0811c30a0dc7c462"
+    },
+    "data/knowledge_base/agricultural_documents.json": {
+      "exists": true,
+      "size_bytes": 99283,
+      "sha256": "193b727ef9bef407ea563971d62ed8ba9a43ba61ccc7d14c640b948b9258e036"
+    },
+    "models/vector_index/vector_documents.json": {
+      "exists": true,
+      "size_bytes": 99283,
+      "sha256": "193b727ef9bef407ea563971d62ed8ba9a43ba61ccc7d14c640b948b9258e036"
+    },
+    "models/vector_index/canonical_index.json": {
+      "exists": true,
+      "size_bytes": 1179,
+      "sha256": "30bf55c6c7a1f4d0820f55ced11dc037b64922b6d5ad321a0a0f34264e6ed318"
+    },
+    "src/contracts.py": {
+      "exists": true,
+      "size_bytes": 7517,
+      "sha256": "1b655ee63bd228cf1ec9101c0f006d8e027d8ce4955f8e931d347dd1a6aa5f63"
+    },
+    "src/pipeline.py": {
+      "exists": true,
+      "size_bytes": 5773,
+      "sha256": "21766b291a406e6fb89c4eff1346c097aa279fd73136fcc321528dc6ea387b61"
+    },
+    "src/vision/classifier.py": {
+      "exists": true,
+      "size_bytes": 5925,
+      "sha256": "f7a89cd125a59dff6da07135c508d49b1114b12491ed85fbacae61e50f0b6c1f"
+    },
+    "src/retrieval/rag_retriever.py": {
+      "exists": true,
+      "size_bytes": 8448,
+      "sha256": "c069951a5938833f84da4fc97ee7a9ef1754b283d113931726572ebbcea3d583"
+    },
+    "src/advisory/advisory_generator.py": {
+      "exists": true,
+      "size_bytes": 8711,
+      "sha256": "fb402d858a7fcd28d3cad6f4d3235bf13ea14e0ea5b86ab02758ec36644db2ca"
+    }
+  }
+}

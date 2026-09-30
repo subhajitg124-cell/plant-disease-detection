@@ -1,0 +1,34 @@
+{
+  "milestone": "T-7 to T-1 Unseen Dataset Adaptation",
+  "adapted_classes": [
+    "cassava_brown_streak",
+    "rice_blast",
+    "wheat_leaf_rust",
+    "cotton_bacterial_blight"
+  ],
+  "num_adapted_classes": 4,
+  "support_shots_per_class": 5,
+  "query_samples_per_class": 10,
+  "total_query_samples": 40,
+  "adaptation_accuracy": 0.85,
+  "adaptation_latency_ms": 284.96,
+  "sample_unseen_diagnosis": {
+    "query_target": "Rice Blast",
+    "predicted_plant": "Rice",
+    "predicted_disease": "Blast (Magnaporthe oryzae)",
+    "confidence_score": 0.99,
+    "status": "supported",
+    "actionable_prevention": [
+      "Resistant cultivars",
+      "Avoid excessive nitrogen application"
+    ],
+    "treatment_steps": [
+      "Tricyclazole 75 WP spray",
+      "Kasugamycin bactericide/fungicide"
+    ],
+    "extension_sources": [
+      "IRRI Rice Knowledge Bank",
+      "UC IPM Rice Guidelines"
+    ]
+  }
+}

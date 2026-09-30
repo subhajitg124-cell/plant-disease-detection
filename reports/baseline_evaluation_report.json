@@ -1,0 +1,146 @@
+{
+  "accuracy": 0.02631578947368421,
+  "precision_macro": 0.0007476076555023923,
+  "recall_macro": 0.02631578947368421,
+  "f1_macro": 0.0014539110206455365,
+  "precision_weighted": 0.0007476076555023922,
+  "recall_weighted": 0.02631578947368421,
+  "f1_weighted": 0.0014539110206455363,
+  "top1_accuracy": 0.02631578947368421,
+  "top3_accuracy": 0.07894736842105263,
+  "top5_accuracy": 0.13157894736842105,
+  "total_samples": 190,
+  "confusion_matrix_shape": [
+    38,
+    38
+  ],
+  "confusion_matrix_sample_sum": 190,
+  "top_1_accuracy": 0.0263,
+  "top_3_accuracy": 0.0789,
+  "top_5_accuracy": 0.1316,
+  "error_count": 185,
+  "difficult_cases_summary": [
+    {
+      "sample_id": "sample_0_0",
+      "true_class_id": 0,
+      "true_canonical_id": "apple_apple_scab",
+      "true_label": "Apple - Apple scab",
+      "pred_class_id": 12,
+      "pred_canonical_id": "grape_esca_black_measles",
+      "pred_label": "Grape - Esca (Black Measles)",
+      "confidence": 0.03199773654341698,
+      "error_type": "Confusion across similar foliar pathology"
+    },
+    {
+      "sample_id": "sample_0_1",
+      "true_class_id": 0,
+      "true_canonical_id": "apple_apple_scab",
+      "true_label": "Apple - Apple scab",
+      "pred_class_id": 12,
+      "pred_canonical_id": "grape_esca_black_measles",
+      "pred_label": "Grape - Esca (Black Measles)",
+      "confidence": 0.031900715082883835,
+      "error_type": "Confusion across similar foliar pathology"
+    },
+    {
+      "sample_id": "sample_0_2",
+      "true_class_id": 0,
+      "true_canonical_id": "apple_apple_scab",
+      "true_label": "Apple - Apple scab",
+      "pred_class_id": 12,
+      "pred_canonical_id": "grape_esca_black_measles",
+      "pred_label": "Grape - Esca (Black Measles)",
+      "confidence": 0.03170711547136307,
+      "error_type": "Confusion across similar foliar pathology"
+    },
+    {
+      "sample_id": "sample_0_3",
+      "true_class_id": 0,
+      "true_canonical_id": "apple_apple_scab",
+      "true_label": "Apple - Apple scab",
+      "pred_class_id": 21,
+      "pred_canonical_id": "potato_late_blight",
+      "pred_label": "Potato - Late blight",
+      "confidence": 0.03168961778283119,
+      "error_type": "Confusion across similar foliar pathology"
+    },
+    {
+      "sample_id": "sample_0_4",
+      "true_class_id": 0,
+      "true_canonical_id": "apple_apple_scab",
+      "true_label": "Apple - Apple scab",
+      "pred_class_id": 21,
+      "pred_canonical_id": "potato_late_blight",
+      "pred_label": "Potato - Late blight",
+      "confidence": 0.031722597777843475,
+      "error_type": "Confusion across similar foliar pathology"
+    },
+    {
+      "sample_id": "sample_1_0",
+      "true_class_id": 1,
+      "true_canonical_id": "apple_black_rot",
+      "true_label": "Apple - Black rot",
+      "pred_class_id": 12,
+      "pred_canonical_id": "grape_esca_black_measles",
+      "pred_label": "Grape - Esca (Black Measles)",
+      "confidence": 0.03196489438414574,
+      "error_type": "Confusion across similar foliar pathology"
+    },
+    {
+      "sample_id": "sample_1_1",
+      "true_class_id": 1,
+      "true_canonical_id": "apple_black_rot",
+      "true_label": "Apple - Black rot",
+      "pred_class_id": 12,
+      "pred_canonical_id": "grape_esca_black_measles",
+      "pred_label": "Grape - Esca (Black Measles)",
+      "confidence": 0.03182951360940933,
+      "error_type": "Confusion across similar foliar pathology"
+    },
+    {
+      "sample_id": "sample_1_2",
+      "true_class_id": 1,
+      "true_canonical_id": "apple_black_rot",
+      "true_label": "Apple - Black rot",
+      "pred_class_id": 21,
+      "pred_canonical_id": "potato_late_blight",
+      "pred_label": "Potato - Late blight",
+      "confidence": 0.03166574612259865,
+      "error_type": "Confusion across similar foliar pathology"
+    },
+    {
+      "sample_id": "sample_1_3",
+      "true_class_id": 1,
+      "true_canonical_id": "apple_black_rot",
+      "true_label": "Apple - Black rot",
+      "pred_class_id": 21,
+      "pred_canonical_id": "potato_late_blight",
+      "pred_label": "Potato - Late blight",
+      "confidence": 0.03170017525553703,
+      "error_type": "Confusion across similar foliar pathology"
+    },
+    {
+      "sample_id": "sample_1_4",
+      "true_class_id": 1,
+      "true_canonical_id": "apple_black_rot",
+      "true_label": "Apple - Black rot",
+      "pred_class_id": 21,
+      "pred_canonical_id": "potato_late_blight",
+      "pred_label": "Potato - Late blight",
+      "confidence": 0.031744033098220825,
+      "error_type": "Confusion across similar foliar pathology"
+    }
+  ],
+  "adaptation_pipeline_test": {
+    "dev_classes_adapted": [
+      "mango_anthracnose",
+      "rice_brown_spot"
+    ],
+    "adaptation_time_sec": 0.057,
+    "mango_advisory_status": "supported",
+    "mango_advisory_grounded": true,
+    "mango_sources": [
+      "ICAR-CISH Mango Advisory Bulletin"
+    ]
+  }
+}
