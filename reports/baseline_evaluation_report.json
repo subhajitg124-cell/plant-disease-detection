@@ -1,11 +1,11 @@
 {
   "accuracy": 0.02631578947368421,
-  "precision_macro": 0.0007476076555023923,
+  "precision_macro": 0.0006925207756232687,
   "recall_macro": 0.02631578947368421,
-  "f1_macro": 0.0014539110206455365,
-  "precision_weighted": 0.0007476076555023922,
+  "f1_macro": 0.001349527665317139,
+  "precision_weighted": 0.0006925207756232687,
   "recall_weighted": 0.02631578947368421,
-  "f1_weighted": 0.0014539110206455363,
+  "f1_weighted": 0.001349527665317139,
   "top1_accuracy": 0.02631578947368421,
   "top3_accuracy": 0.07894736842105263,
   "top5_accuracy": 0.13157894736842105,
@@ -25,10 +25,10 @@
       "true_class_id": 0,
       "true_canonical_id": "apple_apple_scab",
       "true_label": "Apple - Apple scab",
-      "pred_class_id": 12,
-      "pred_canonical_id": "grape_esca_black_measles",
-      "pred_label": "Grape - Esca (Black Measles)",
-      "confidence": 0.03199773654341698,
+      "pred_class_id": 9,
+      "pred_canonical_id": "corn_northern_leaf_blight",
+      "pred_label": "Corn (maize) - Northern Leaf Blight",
+      "confidence": 0.03344786912202835,
       "error_type": "Confusion across similar foliar pathology"
     },
     {
@@ -36,10 +36,10 @@
       "true_class_id": 0,
       "true_canonical_id": "apple_apple_scab",
       "true_label": "Apple - Apple scab",
-      "pred_class_id": 12,
-      "pred_canonical_id": "grape_esca_black_measles",
-      "pred_label": "Grape - Esca (Black Measles)",
-      "confidence": 0.031900715082883835,
+      "pred_class_id": 9,
+      "pred_canonical_id": "corn_northern_leaf_blight",
+      "pred_label": "Corn (maize) - Northern Leaf Blight",
+      "confidence": 0.03339933604001999,
       "error_type": "Confusion across similar foliar pathology"
     },
     {
@@ -47,10 +47,10 @@
       "true_class_id": 0,
       "true_canonical_id": "apple_apple_scab",
       "true_label": "Apple - Apple scab",
-      "pred_class_id": 12,
-      "pred_canonical_id": "grape_esca_black_measles",
-      "pred_label": "Grape - Esca (Black Measles)",
-      "confidence": 0.03170711547136307,
+      "pred_class_id": 9,
+      "pred_canonical_id": "corn_northern_leaf_blight",
+      "pred_label": "Corn (maize) - Northern Leaf Blight",
+      "confidence": 0.03340530768036842,
       "error_type": "Confusion across similar foliar pathology"
     },
     {
@@ -58,10 +58,10 @@
       "true_class_id": 0,
       "true_canonical_id": "apple_apple_scab",
       "true_label": "Apple - Apple scab",
-      "pred_class_id": 21,
-      "pred_canonical_id": "potato_late_blight",
-      "pred_label": "Potato - Late blight",
-      "confidence": 0.03168961778283119,
+      "pred_class_id": 9,
+      "pred_canonical_id": "corn_northern_leaf_blight",
+      "pred_label": "Corn (maize) - Northern Leaf Blight",
+      "confidence": 0.03340031951665878,
       "error_type": "Confusion across similar foliar pathology"
     },
     {
@@ -69,10 +69,10 @@
       "true_class_id": 0,
       "true_canonical_id": "apple_apple_scab",
       "true_label": "Apple - Apple scab",
-      "pred_class_id": 21,
-      "pred_canonical_id": "potato_late_blight",
-      "pred_label": "Potato - Late blight",
-      "confidence": 0.031722597777843475,
+      "pred_class_id": 9,
+      "pred_canonical_id": "corn_northern_leaf_blight",
+      "pred_label": "Corn (maize) - Northern Leaf Blight",
+      "confidence": 0.033389657735824585,
       "error_type": "Confusion across similar foliar pathology"
     },
     {
@@ -80,10 +80,10 @@
       "true_class_id": 1,
       "true_canonical_id": "apple_black_rot",
       "true_label": "Apple - Black rot",
-      "pred_class_id": 12,
-      "pred_canonical_id": "grape_esca_black_measles",
-      "pred_label": "Grape - Esca (Black Measles)",
-      "confidence": 0.03196489438414574,
+      "pred_class_id": 9,
+      "pred_canonical_id": "corn_northern_leaf_blight",
+      "pred_label": "Corn (maize) - Northern Leaf Blight",
+      "confidence": 0.033423613756895065,
       "error_type": "Confusion across similar foliar pathology"
     },
     {
@@ -91,10 +91,10 @@
       "true_class_id": 1,
       "true_canonical_id": "apple_black_rot",
       "true_label": "Apple - Black rot",
-      "pred_class_id": 12,
-      "pred_canonical_id": "grape_esca_black_measles",
-      "pred_label": "Grape - Esca (Black Measles)",
-      "confidence": 0.03182951360940933,
+      "pred_class_id": 9,
+      "pred_canonical_id": "corn_northern_leaf_blight",
+      "pred_label": "Corn (maize) - Northern Leaf Blight",
+      "confidence": 0.03339455649256706,
       "error_type": "Confusion across similar foliar pathology"
     },
     {
@@ -102,10 +102,10 @@
       "true_class_id": 1,
       "true_canonical_id": "apple_black_rot",
       "true_label": "Apple - Black rot",
-      "pred_class_id": 21,
-      "pred_canonical_id": "potato_late_blight",
-      "pred_label": "Potato - Late blight",
-      "confidence": 0.03166574612259865,
+      "pred_class_id": 9,
+      "pred_canonical_id": "corn_northern_leaf_blight",
+      "pred_label": "Corn (maize) - Northern Leaf Blight",
+      "confidence": 0.033405646681785583,
       "error_type": "Confusion across similar foliar pathology"
     },
     {
@@ -113,10 +113,10 @@
       "true_class_id": 1,
       "true_canonical_id": "apple_black_rot",
       "true_label": "Apple - Black rot",
-      "pred_class_id": 21,
-      "pred_canonical_id": "potato_late_blight",
-      "pred_label": "Potato - Late blight",
-      "confidence": 0.03170017525553703,
+      "pred_class_id": 9,
+      "pred_canonical_id": "corn_northern_leaf_blight",
+      "pred_label": "Corn (maize) - Northern Leaf Blight",
+      "confidence": 0.033394694328308105,
       "error_type": "Confusion across similar foliar pathology"
     },
     {
@@ -124,10 +124,10 @@
       "true_class_id": 1,
       "true_canonical_id": "apple_black_rot",
       "true_label": "Apple - Black rot",
-      "pred_class_id": 21,
-      "pred_canonical_id": "potato_late_blight",
-      "pred_label": "Potato - Late blight",
-      "confidence": 0.031744033098220825,
+      "pred_class_id": 9,
+      "pred_canonical_id": "corn_northern_leaf_blight",
+      "pred_label": "Corn (maize) - Northern Leaf Blight",
+      "confidence": 0.033379118889570236,
       "error_type": "Confusion across similar foliar pathology"
     }
   ],
@@ -136,7 +136,7 @@
       "mango_anthracnose",
       "rice_brown_spot"
     ],
-    "adaptation_time_sec": 0.057,
+    "adaptation_time_sec": 0.1267,
     "mango_advisory_status": "supported",
     "mango_advisory_grounded": true,
     "mango_sources": [

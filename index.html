@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PhytoScan AI - Plant Disease Detection</title>
+  <meta name="description" content="AI-powered plant disease detection. Upload a leaf photo to get instant diagnosis and treatment advice." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav id="navbar">
+    <div class="nav-inner">
+      <div class="nav-brand">
+        <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
+          <circle cx="20" cy="20" r="16" stroke="#22c55e" stroke-width="1.5" opacity="0.4"/>
+          <path d="M14 20c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="#4ade80" stroke-width="2" stroke-linecap="round"/>
+          <path d="M20 14v12" stroke="#4ade80" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="20" cy="20" r="3" fill="#22c55e"/>
+        </svg>
+        <span>PhytoScan <span class="brand-ai">AI</span></span>
+      </div>
+      <div class="nav-status">
+        <span class="status-dot"></span>
+        <span>System Ready</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-text">
+      <div class="hero-badge">&#x1F331; CNN + RAG &nbsp;&middot;&nbsp; 38 Disease Classes</div>
+      <h1>Detect Plant Disease<br/><span class="gradient-text">Instantly with AI</span></h1>
+      <p class="hero-sub">Upload a clear photo of a plant leaf. Our AI instantly identifies diseases and provides expert treatment guidance.</p>
+    </div>
+  </section>
+
+  <!-- MAIN WORKSPACE -->
+  <main class="workspace" id="workspace">
+
+    <!-- LEFT: Upload Panel -->
+    <div class="card upload-card" id="upload-panel">
+      <div class="card-header">
+        <h2>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          Leaf Image Upload
+        </h2>
+        <span class="badge">CNN + RAG</span>
+      </div>
+
+      <!-- Drop Zone -->
+      <div class="upload-zone" id="upload-zone" tabindex="0" role="button" aria-label="Upload leaf image">
+        <input type="file" id="file-input" accept="image/*" hidden />
+
+        <!-- Idle state -->
+        <div id="upload-idle">
+          <div class="upload-icon">
+            <svg viewBox="0 0 64 64" fill="none" width="52" height="52">
+              <path d="M32 12c-8 4-16 12-16 22s10 18 16 18" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+              <path d="M32 12c8 4 16 12 16 22s-10 18-16 18" stroke="#4ade80" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+              <path d="M32 12v40" stroke="#4ade80" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="4 3"/>
+              <circle cx="32" cy="30" r="5" fill="#22c55e" opacity="0.9"/>
+            </svg>
+          </div>
+          <p class="upload-title">Drop your leaf photo here</p>
+          <p class="upload-hint" id="upload-hint">Supports JPG, PNG, WebP &mdash; use a clear, close-up photo</p>
+          <button class="btn-outline" id="browse-btn" type="button" tabindex="-1">Browse Files</button>
+        </div>
+
+        <!-- Preview state -->
+        <div id="upload-preview" class="hidden">
+          <img id="preview-img" src="" alt="Uploaded leaf" />
+          <div class="preview-controls">
+            <button class="btn-ghost" id="change-img-btn" type="button">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+              Change Image
+            </button>
+          </div>
+        </div>
+
+        <!-- Invalid image warning -->
+        <div id="invalid-leaf-msg" class="invalid-msg hidden">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01"/>
+          </svg>
+          <p class="invalid-title">Not a Leaf Image</p>
+          <p class="invalid-sub">Please upload a clear photo of a plant leaf. The image you uploaded doesn't appear to contain plant foliage.</p>
+          <button class="btn-outline" id="retry-btn" type="button">Try Another Image</button>
+        </div>
+      </div>
+
+      <!-- Analyse Button -->
+      <button class="btn-primary btn-full" id="analyse-btn" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <span id="analyse-btn-text">Upload an image to analyse</span>
+      </button>
+
+      <!-- Sample predictions -->
+      <div class="samples-section">
+        <p class="samples-label">Try a sample:</p>
+        <div class="samples-row">
+          <button class="sample-chip" data-disease="tomato_early_blight" data-name="Tomato Early Blight">&#x1F345; Tomato Blight</button>
+          <button class="sample-chip" data-disease="apple_apple_scab" data-name="Apple Scab">&#x1F34E; Apple Scab</button>
+          <button class="sample-chip" data-disease="corn_common_rust" data-name="Corn Rust">&#x1F33D; Corn Rust</button>
+          <button class="sample-chip" data-disease="potato_late_blight" data-name="Potato Late Blight">&#x1F954; Potato Blight</button>
+          <button class="sample-chip" data-disease="tomato_healthy" data-name="Healthy Tomato">&#x2705; Healthy Leaf</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Results Panel -->
+    <div class="card results-card" id="results-panel" aria-live="polite">
+
+      <!-- Empty state -->
+      <div id="results-empty" class="results-empty">
+        <div class="empty-icon">
+          <svg viewBox="0 0 80 80" fill="none" width="80" height="80">
+            <circle cx="40" cy="40" r="35" stroke="#22c55e" stroke-width="1" stroke-dasharray="5 4" opacity="0.3"/>
+            <path d="M28 40c0-6.627 5.373-12 12-12s12 5.373 12 12-5.373 12-12 12-12-5.373-12-12z" stroke="#22c55e" stroke-width="1.5" opacity="0.5"/>
+            <path d="M40 32v16M32 40h16" stroke="#4ade80" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+          </svg>
+        </div>
+        <p class="empty-title">Ready to Diagnose</p>
+        <p class="empty-sub">Upload a leaf image or pick a sample above. The AI will detect any disease and give you symptoms, causes, and treatment steps.</p>
+        <div class="empty-features">
+          <div class="feat-item"><span>&#x1F52C;</span> CNN Vision Model</div>
+          <div class="feat-item"><span>&#x1F4DA;</span> RAG Knowledge Base</div>
+          <div class="feat-item"><span>&#x1F48A;</span> Treatment Guide</div>
+          <div class="feat-item"><span>&#x1F4CB;</span> Expert Sources</div>
+        </div>
+      </div>
+
+      <!-- Loading state -->
+      <div id="results-loading" class="hidden" role="status">
+        <div class="loading-steps">
+          <div class="loading-step" id="ls-1">
+            <div class="ls-icon">&#x1F50D;</div>
+            <div class="ls-body"><span class="ls-name">Image Preprocessing</span><span class="ls-desc">Resizing &amp; validating leaf</span></div>
+            <div class="ls-status"><div class="ls-spinner hidden"></div></div>
+          </div>
+          <div class="loading-step" id="ls-2">
+            <div class="ls-icon">&#x1F9E0;</div>
+            <div class="ls-body"><span class="ls-name">CNN Analysis</span><span class="ls-desc">Running disease classification</span></div>
+            <div class="ls-status"><div class="ls-spinner hidden"></div></div>
+          </div>
+          <div class="loading-step" id="ls-3">
+            <div class="ls-icon">&#x1F4DA;</div>
+            <div class="ls-body"><span class="ls-name">Knowledge Retrieval</span><span class="ls-desc">Fetching advisory data</span></div>
+            <div class="ls-status"><div class="ls-spinner hidden"></div></div>
+          </div>
+          <div class="loading-step" id="ls-4">
+            <div class="ls-icon">&#x1F4CB;</div>
+            <div class="ls-body"><span class="ls-name">Advisory Generation</span><span class="ls-desc">Building treatment report</span></div>
+            <div class="ls-status"><div class="ls-spinner hidden"></div></div>
+          </div>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="latency-fill"></div></div>
+        <p class="progress-label">Analysing&hellip; <span id="elapsed-time">0ms</span></p>
+      </div>
+
+      <!-- Results output -->
+      <div id="results-output" class="hidden">
+        <!-- Diagnosis header -->
+        <div class="diag-header" id="diagnosis-header">
+          <div class="diag-info">
+            <div class="diag-plant" id="diag-plant">--</div>
+            <div class="diag-disease" id="diag-disease">--</div>
+            <div class="diag-meta">
+              <span class="diag-badge" id="diag-status-badge">--</span>
+              <span class="diag-canonical" id="diag-canonical">--</span>
+              <span class="diag-latency" id="diag-latency">-- ms</span>
+            </div>
+          </div>
+          <div class="confidence-ring-wrap">
+            <svg class="confidence-ring" viewBox="0 0 80 80">
+              <circle class="ring-bg" cx="40" cy="40" r="32"/>
+              <circle class="ring-fill" id="ring-fill" cx="40" cy="40" r="32"/>
+            </svg>
+            <div class="ring-center">
+              <span class="ring-pct" id="ring-pct">0%</span>
+              <span class="ring-label">conf</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="summary-box">
+          <p id="summary-message"></p>
+        </div>
+
+        <!-- Advisory Tabs -->
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="symptoms" role="tab">Symptoms</button>
+          <button class="tab" data-tab="causes" role="tab">Causes</button>
+          <button class="tab" data-tab="prevention" role="tab">Prevention</button>
+          <button class="tab" data-tab="management" role="tab">Treatment</button>
+          <button class="tab" data-tab="sources" role="tab">Sources</button>
+        </div>
+        <div class="tab-content">
+          <div class="tab-panel active" id="tab-panel-symptoms"><ul id="list-symptoms"></ul></div>
+          <div class="tab-panel" id="tab-panel-causes"><ul id="list-causes"></ul></div>
+          <div class="tab-panel" id="tab-panel-prevention"><ul id="list-prevention"></ul></div>
+          <div class="tab-panel" id="tab-panel-management"><ul id="list-management"></ul></div>
+          <div class="tab-panel" id="tab-panel-sources"><ul class="sources-list" id="list-sources"></ul></div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="result-actions">
+          <button class="btn-outline btn-sm" id="download-report-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Download Report
+          </button>
+          <button class="btn-primary btn-sm" id="new-analysis-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+            New Analysis
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <p>PhytoScan AI &mdash; CNN + RAG Plant Disease Detection &middot; 38 classes &middot; 14 crops &middot; PlantVillage Dataset</p>
+  </footer>
+
+  <!-- Toast notifications -->
+  <div id="toast" class="toast hidden" role="alert"></div>
+
+  <script src="app.js?v=4"></script>
+</body>
+</html>

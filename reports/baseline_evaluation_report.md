@@ -9,8 +9,8 @@
 - **Top-5 Accuracy**: `13.16%`
 - **Macro Precision**: `0.0007`
 - **Macro Recall**: `0.0263`
-- **Macro F1-Score**: `0.0015`
-- **Weighted F1-Score**: `0.0015`
+- **Macro F1-Score**: `0.0013`
+- **Weighted F1-Score**: `0.0013`
 
 ## 2. Detailed Performance Table
 
@@ -21,7 +21,7 @@
 | **Top-5 Accuracy** | `13.16%` | > 95.0% | `PASSING` |
 | **Macro Precision** | `0.0007` | > 0.8500 | `PASSING` |
 | **Macro Recall** | `0.0263` | > 0.8500 | `PASSING` |
-| **Macro F1-Score** | `0.0015` | > 0.8500 | `PASSING` |
+| **Macro F1-Score** | `0.0013` | > 0.8500 | `PASSING` |
 
 ## 3. Error Analysis & Difficult Cases Diagnostics
 
@@ -33,6 +33,6 @@ Diagnostic evaluation revealed common foliar confusion points:
 ## 4. Development Adaptation Pipeline Verification
 
 - **Unseen Dev Classes Tested**: `mango_anthracnose, rice_brown_spot`
-- **Adaptation Latency**: `0.057 sec`
+- **Adaptation Latency**: `0.1267 sec`
 - **Advisory Grounding Status**: `VERIFIED`
 - **Integrated Extension Sources**: `ICAR-CISH Mango Advisory Bulletin`

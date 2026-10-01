@@ -2,44 +2,44 @@
   "device": "cpu",
   "num_iterations": 100,
   "preprocessing": {
-    "mean_ms": 1.401,
-    "median_ms": 1.358,
-    "min_ms": 1.051,
-    "max_ms": 1.904,
-    "p95_ms": 1.797,
-    "std_ms": 0.206
+    "mean_ms": 0.868,
+    "median_ms": 0.806,
+    "min_ms": 0.668,
+    "max_ms": 1.728,
+    "p95_ms": 1.163,
+    "std_ms": 0.164
   },
   "vision_inference": {
-    "mean_ms": 24.284,
-    "median_ms": 23.96,
-    "min_ms": 13.922,
-    "max_ms": 76.345,
-    "p95_ms": 36.906,
-    "std_ms": 8.902
+    "mean_ms": 18.673,
+    "median_ms": 13.227,
+    "min_ms": 9.483,
+    "max_ms": 37.799,
+    "p95_ms": 35.335,
+    "std_ms": 9.63
   },
   "rag_retrieval": {
-    "mean_ms": 0.006,
-    "median_ms": 0.005,
-    "min_ms": 0.004,
-    "max_ms": 0.039,
-    "p95_ms": 0.008,
-    "std_ms": 0.005
+    "mean_ms": 0.003,
+    "median_ms": 0.003,
+    "min_ms": 0.002,
+    "max_ms": 0.028,
+    "p95_ms": 0.006,
+    "std_ms": 0.004
   },
   "advisory_generation": {
-    "mean_ms": 0.037,
-    "median_ms": 0.032,
-    "min_ms": 0.03,
-    "max_ms": 0.194,
-    "p95_ms": 0.069,
-    "std_ms": 0.02
+    "mean_ms": 0.014,
+    "median_ms": 0.013,
+    "min_ms": 0.012,
+    "max_ms": 0.071,
+    "p95_ms": 0.018,
+    "std_ms": 0.006
   },
   "end_to_end_total": {
-    "mean_ms": 27.471,
-    "median_ms": 26.377,
-    "min_ms": 13.16,
-    "max_ms": 177.75,
-    "p95_ms": 51.129,
-    "std_ms": 19.251
+    "mean_ms": 32.351,
+    "median_ms": 32.136,
+    "min_ms": 28.301,
+    "max_ms": 38.105,
+    "p95_ms": 36.004,
+    "std_ms": 1.966
   },
-  "throughput_fps": 36.4
+  "throughput_fps": 30.9
 }

@@ -10,8 +10,8 @@
   "support_shots_per_class": 5,
   "query_samples_per_class": 10,
   "total_query_samples": 40,
-  "adaptation_accuracy": 0.85,
-  "adaptation_latency_ms": 284.96,
+  "adaptation_accuracy": 0.8,
+  "adaptation_latency_ms": 274.66,
   "sample_unseen_diagnosis": {
     "query_target": "Rice Blast",
     "predicted_plant": "Rice",
