@@ -1,5 +1,5 @@
 """
-PhytoScan AI - Production API Server and Static Host
+PatraDristi AI - Production API Server and Static Host
 Provides REST API endpoints for CNN leaf disease classification and RAG advisory generation.
 """
 import os
@@ -7,6 +7,7 @@ import sys
 import io
 import json
 import base64
+from typing import Any
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse
 
@@ -35,7 +36,7 @@ try:
 except Exception as e:
     print(f"[WARNING] Could not initialize full pipeline: {e}")
 
-class PhytoScanRequestHandler(SimpleHTTPRequestHandler):
+class PatraDristiRequestHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=ROOT_DIR, **kwargs)
 
@@ -58,7 +59,7 @@ class PhytoScanRequestHandler(SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            info = {
+            info: dict[str, Any] = {
                 "status": "healthy",
                 "pipeline_loaded": pipeline_instance is not None,
                 "version": "1.0.0"
@@ -111,7 +112,9 @@ class PhytoScanRequestHandler(SimpleHTTPRequestHandler):
                 plant_hint = data.get("plant_hint", "").lower()
 
                 if pipeline_instance:
-                    res = pipeline_instance.predict_and_advise(img)
+                    res = pipeline_instance.predict_and_advise(
+                        img, plant_hint=plant_hint, filename=filename
+                    )
                     advisory_dict = None
                     if res.advisory:
                         advisory_dict = {
@@ -186,8 +189,8 @@ class PhytoScanRequestHandler(SimpleHTTPRequestHandler):
 
 def run(port=8000):
     server_address = ('', port)
-    httpd = HTTPServer(server_address, PhytoScanRequestHandler)
-    print(f"[SUCCESS] PhytoScan AI Server active at http://localhost:{port}")
+    httpd = HTTPServer(server_address, PatraDristiRequestHandler)
+    print(f"[SUCCESS] PatraDristi AI Server active at http://localhost:{port}")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

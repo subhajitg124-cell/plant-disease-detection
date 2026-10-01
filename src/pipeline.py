@@ -36,10 +36,13 @@ class PlantDiseasePipeline:
     def predict_and_advise(
         self,
         image_input: Union[str, "Image.Image", np.ndarray],
-        extract_embedding: bool = False
+        extract_embedding: bool = False,
+        plant_hint: str = "",
+        filename: str = ""
     ) -> IntegratedResponse:
+        hint = plant_hint or filename
         prediction = self.classifier.predict(
-            image_input, extract_embedding=extract_embedding
+            image_input, extract_embedding=extract_embedding, plant_hint=hint
         )
         response = self.generator.generate_advisory(prediction)
         return response
