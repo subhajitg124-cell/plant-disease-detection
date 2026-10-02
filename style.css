@@ -309,6 +309,40 @@ body {
 .ring-pct { font-weight: 800; font-size: 1.05rem; color: var(--text); line-height: 1; }
 .ring-label { font-size: 0.65rem; color: var(--text-dim); }
 
+/* Diagnostic Overview Metrics */
+.diag-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.metric-card {
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.metric-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+.metric-val {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.metric-val.status-healthy { color: var(--green-light); }
+.metric-val.status-diseased { color: #fca5a5; }
+.metric-val.priority-immediate { color: #f87171; }
+.metric-val.priority-moderate { color: #fbbf24; }
+.metric-val.priority-routine { color: #4ade80; }
+
 /* Summary */
 .summary-box {
   background: var(--green-dim); border: 1px solid var(--green-border);

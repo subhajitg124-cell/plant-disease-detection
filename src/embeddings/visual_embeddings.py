@@ -14,13 +14,16 @@ try:
 except ImportError:
     HAS_TORCH = False
 
-try:
-    from src.vision.model import PlantDiseaseCNN
-except ImportError:
+if HAS_TORCH:
     try:
-        from vision.model import PlantDiseaseCNN
+        from src.vision.model import PlantDiseaseCNN
     except ImportError:
-        from model import PlantDiseaseCNN
+        try:
+            from vision.model import PlantDiseaseCNN
+        except ImportError:
+            from model import PlantDiseaseCNN
+else:
+    PlantDiseaseCNN = None
 
 try:
     from src.preprocessing.pipeline import PreprocessingPipeline
@@ -47,14 +50,28 @@ class VisualEmbeddingExtractor:
             else:
                 self.device = torch.device(device)
 
-            self.model = PlantDiseaseCNN(num_classes=38, embedding_dim=embedding_dim).to(self.device)
+            checkpoint = None
+            state_dict = None
+            output_classes = 38
             if model_path and os.path.exists(model_path):
                 try:
-                    state = torch.load(model_path, map_location=self.device)
-                    if isinstance(state, dict) and "state_dict" in state:
-                        self.model.load_state_dict(state["state_dict"])
+                    checkpoint = torch.load(model_path, map_location=self.device)
+                    if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
+                        state_dict = checkpoint["state_dict"]
+                        output_classes = int(
+                            checkpoint.get("num_classes", len(checkpoint.get("class_ids", [])) or 38)
+                        )
                     else:
-                        self.model.load_state_dict(state)
+                        state_dict = checkpoint
+                except Exception as e:
+                    print(f"Warning: Could not read embedding model checkpoint: {e}")
+
+            self.model = PlantDiseaseCNN(
+                num_classes=output_classes, embedding_dim=embedding_dim
+            ).to(self.device)
+            if state_dict is not None:
+                try:
+                    self.model.load_state_dict(state_dict)
                 except Exception as e:
                     print(f"Warning: Could not load embedding model weights: {e}")
             self.model.eval()

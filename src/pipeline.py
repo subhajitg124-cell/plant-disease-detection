@@ -111,6 +111,9 @@ class PlantDiseasePipeline:
             "classifier": {
                 "model_path": self.classifier.model_path,
                 "num_classes": self.classifier.num_classes,
+                "active_class_ids": self.classifier.active_class_ids,
+                "checkpoint_loaded": self.classifier.checkpoint_loaded,
+                "model_is_reliable": self.classifier.model_is_reliable,
                 "confidence_threshold": self.classifier.confidence_threshold,
                 "device": str(self.classifier.device)
             },

@@ -30,7 +30,7 @@
                        │     2. Vision CNN Classifier Engine   │
                        │   - 4-Block Conv2D + BatchNorm + GAP  │
                        │   - 128-dim Visual Embedding Head     │
-                       │   - 38 PlantVillage Disease Classes   │
+                       │   - Classes in trained checkpoint    │
                        └───────────────────┬───────────────────┘
                                            │
                          [ VisionPrediction (Data Contract) ]
@@ -84,7 +84,7 @@
 - **Backend Adaptability**: Built-in NumPy cosine similarity fallback, with automatic FAISS (`faiss.IndexFlatIP`) and ChromaDB persistent storage integration when installed.
 
 ### 3.3 Vision Engine (`src/vision/`)
-- **Model**: `PlantDiseaseCNN` featuring 4 Convolutional blocks, Batch Normalization, ReLU, Max Pooling, Global Average Pooling, a 128-dimensional bottleneck feature extractor, and a 38-class classification head.
+- **Model**: PlantDiseaseCNN with 4 convolutional blocks and a 128-dimensional feature extractor. Its output head matches the classes recorded in the trained checkpoint (31 in the currently organized image set; 38 when all classes are present).
 - **Pre-Filtering & Gating**:
   - `ImageValidator`: Verifies decodability, dimension boundaries (min 32x32), and plant foliage coverage via HSV chlorophyll thresholding.
   - Non-plant images, corrupted uploads, and low-confidence predictions are cleanly rejected before generating ungrounded advice.
@@ -97,9 +97,26 @@
 ## 4. Quick Start & Execution
 
 ### 4.1 Prerequisites
-Python 3.10+ with `torch`, `torchvision`, `numpy`, `pillow`, `opencv-python`, `scikit-learn`.
+Use a Python version supported by your Windows PyTorch build. The full app also uses torchvision, NumPy, Pillow, OpenCV, and scikit-learn.
 
-### 4.2 Run End-to-End Prediction
+### 4.2 Train the CNN on real leaf images
+
+Before training, install NumPy and Pillow in the project environment:
+
+    .\.venv\Scripts\python.exe -m pip install numpy pillow
+
+Install PyTorch with the [official Windows selector](https://pytorch.org/get-started/locally/) for your machine. Select CUDA support if you want the NVIDIA GPU; the trainer uses CUDA automatically when available.
+
+Then run this from the project root in PowerShell:
+
+    .\.venv\Scripts\python.exe -m src.vision.train --epochs 15 --batch-size 32
+
+The trainer reads real images from data/raw/PlantVillage/<original_label>/, uses the class IDs in data/metadata/plantvillage_class_mapping.csv, and makes stratified 70/15/15 train, validation, and test splits. It saves models/plant_disease_cnn.pth and validation/held-out test metrics in reports/training_report.json. To also create CSV manifests containing real image paths, run scripts/prepare_dataset.py from the project root.
+
+The currently organized image set contains 31 of the 38 mapped classes. The trainer records the classes it actually learned, and the app reports predictions for absent classes as unknown. Add the missing class folders before training if you need a complete 38-class model.
+
+
+### 4.3 Run End-to-End Prediction
 ```python
 from src.pipeline import PlantDiseasePipeline
 import numpy as np
@@ -116,7 +133,7 @@ print(f"Message: {result.user_message}")
 print(f"Sources: {result.sources}")
 ```
 
-### 4.3 Query Agricultural Knowledge Base Directly
+### 4.4 Query Agricultural Knowledge Base Directly
 ```python
 from src.retrieval.rag_retriever import RAGRetriever
 
@@ -126,7 +143,7 @@ for doc, score in results:
     print(f"[{score:.4f}] {doc['canonical_id']}: {doc['plant']} - {doc['disease']}")
 ```
 
-### 4.4 Rebuild Knowledge Base & Vector Index
+### 4.5 Rebuild Knowledge Base & Vector Index
 ```bash
 # Rebuild JSON knowledge base documents
 python scripts/build_knowledge_base.py

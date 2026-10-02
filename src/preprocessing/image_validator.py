@@ -61,15 +61,25 @@ class ImageValidator:
         
         if HAS_CV2:
             hsv = cv2.cvtColor(img_arr, cv2.COLOR_RGB2HSV)
-            lower_green = np.array([20, 20, 20])
-            upper_green = np.array([100, 255, 255])
-            mask = cv2.inRange(hsv, lower_green, upper_green)
+            # Encompass green, yellow, olive, brown, and orange-tinted foliar tissue with minimum saturation
+            lower_foliage = np.array([10, 25, 20])
+            upper_foliage = np.array([105, 255, 255])
+            mask = cv2.inRange(hsv, lower_foliage, upper_foliage)
             green_ratio = np.count_nonzero(mask) / float(img_arr.shape[0] * img_arr.shape[1])
         else:
             r = img_arr[:, :, 0].astype(np.float32)
             g = img_arr[:, :, 1].astype(np.float32)
             b = img_arr[:, :, 2].astype(np.float32)
-            green_mask = (g > r * 0.8) & (g > b * 0.8) & (g > 30)
+            max_c = np.maximum(np.maximum(r, g), b)
+            min_c = np.minimum(np.minimum(r, g), b)
+            diff = max_c - min_c
+
+            # Match healthy green leaves, yellow chlorosis, and brown foliar necrosis with non-neutral saturation
+            green_mask = (diff >= 12) & (
+                ((g > r * 0.85) & (g > b * 1.05) & (g > 30)) |
+                ((r > 45) & (g > 25) & (b < 150) & (r > b + 12) & (g > b - 5)) |
+                ((r > 80) & (g > 80) & (b < 120) & (r + g > b * 2.2))
+            )
             green_ratio = np.count_nonzero(green_mask) / float(img_arr.shape[0] * img_arr.shape[1])
 
         return float(green_ratio)

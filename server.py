@@ -75,7 +75,9 @@ class PatraDristiRequestHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             classes = []
             if pipeline_instance and hasattr(pipeline_instance.classifier, "class_map"):
-                for cid, cdata in pipeline_instance.classifier.class_map.items():
+                classifier = pipeline_instance.classifier
+                for cid in classifier.active_class_ids:
+                    cdata = classifier.class_map[cid]
                     classes.append({
                         "id": cid,
                         "canonical": cdata.get("canonical_id"),
@@ -137,16 +139,13 @@ class PatraDristiRequestHandler(SimpleHTTPRequestHandler):
                         "sources": res.sources
                     }
                 else:
-                    response_payload = {
-                        "plant": "Tomato",
-                        "disease": "Early Blight",
-                        "canonical_id": "tomato_early_blight",
-                        "confidence": 0.92,
-                        "status": "supported",
-                        "user_message": "Visual analysis detected concentric target lesions typical of Early Blight.",
-                        "advisory": None,
-                        "sources": []
-                    }
+                    self.send_response(503)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({
+                        "error": "Prediction pipeline is unavailable; no diagnosis was generated."
+                    }).encode("utf-8"))
+                    return
 
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")

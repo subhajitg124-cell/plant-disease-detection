@@ -29,6 +29,7 @@ data/raw/*
 data/processed/*
 data/external/*
 !data/raw/.gitkeep
+!data/raw/sample_leaves/**
 !data/processed/.gitkeep
 !data/external/.gitkeep
 !models/.gitkeep

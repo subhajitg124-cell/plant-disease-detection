@@ -1,141 +1,418 @@
+"""
+Train the PlantDiseaseCNN from the extracted PlantVillage class folders.
+
+The dataset is read from data/raw/PlantVillage/<original_label>/*.jpg.
+Class IDs come from data/metadata/plantvillage_class_mapping.csv; missing
+classes are excluded and recorded in the checkpoint instead of being assigned
+random labels.
+"""
+from __future__ import annotations
+
+import argparse
+import csv
+import json
 import os
+import random
 import sys
+from collections import defaultdict
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
-if root_dir not in sys.path:
-    sys.path.insert(0, root_dir)
+try:
+    import numpy as np
+except ImportError:
+    np = None
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
 
-from typing import Optional, Dict, Any
-import numpy as np
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 try:
     import torch
     import torch.nn as nn
-    import torch.optim as optim
+    from torch.utils.data import DataLoader, Dataset
     HAS_TORCH = True
 except ImportError:
+    torch = None
+    nn = None
+    DataLoader = None
+    Dataset = object
     HAS_TORCH = False
 
-try:
+if HAS_TORCH:
     from src.vision.model import PlantDiseaseCNN
-except ImportError:
-    from model import PlantDiseaseCNN
+else:
+    PlantDiseaseCNN = None
+
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 
-def create_synthetic_dataset(num_samples: int = 100, num_classes: int = 38):
-    if not HAS_TORCH:
-        return None, None
+from src.dataset_index import discover_class_images, load_class_mapping, split_images
 
-    x_data = torch.randn(num_samples, 3, 224, 224)
-    y_data = torch.randint(0, num_classes, (num_samples,))
-    return x_data, y_data
+class LeafImageDataset(Dataset):
+    def __init__(self, records: Sequence[Tuple[Path, int]], augment: bool = False):
+        self.records = list(records)
+        from src.preprocessing.image_transforms import ImageTransformer
+        self.transformer = ImageTransformer(target_size=(224, 224), augment=augment)
+
+    def __len__(self) -> int:
+        return len(self.records)
+
+    def __getitem__(self, index: int):
+        path, class_index = self.records[index]
+        try:
+            with Image.open(path) as source:
+                image = source.convert("RGB")
+            array = self.transformer.transform(image, return_tensor=False)
+        except Exception as error:
+            raise RuntimeError(f"Could not load training image {path}: {error}") from error
+
+        tensor = torch.from_numpy(np.asarray(array, dtype=np.float32).copy())
+        return tensor, int(class_index)
 
 
-def load_dataset_from_csv(csv_path: str, num_samples: int = 150):
-    import csv
-    if not HAS_TORCH or not os.path.exists(csv_path):
-        return create_synthetic_dataset(num_samples=num_samples, num_classes=38)
-    
-    labels_list = []
-    with open(csv_path, mode="r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            labels_list.append(int(row["class_id"]))
-            if len(labels_list) >= num_samples:
-                break
+def set_seed(seed: int) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
-    num_loaded = len(labels_list)
-    if num_loaded == 0:
-        return create_synthetic_dataset(num_samples=num_samples, num_classes=38)
 
-    x_data = torch.randn(num_loaded, 3, 224, 224)
-    y_data = torch.tensor(labels_list, dtype=torch.long)
-    return x_data, y_data
+def evaluate(
+    model,
+    loader,
+    criterion,
+    device,
+    class_count: int,
+) -> Dict[str, float]:
+    model.eval()
+    total_loss = 0.0
+    total = 0
+    correct = 0
+    per_class_correct = [0] * class_count
+    per_class_total = [0] * class_count
+
+    with torch.no_grad():
+        for images, labels in loader:
+            images = images.to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
+            logits, _ = model(images)
+            loss = criterion(logits, labels)
+            predictions = logits.argmax(dim=1)
+
+            batch_size = labels.size(0)
+            total_loss += float(loss.item()) * batch_size
+            total += batch_size
+            correct += int((predictions == labels).sum().item())
+            for label, prediction in zip(labels.tolist(), predictions.tolist()):
+                per_class_total[label] += 1
+                if label == prediction:
+                    per_class_correct[label] += 1
+
+    class_accuracies = [
+        per_class_correct[index] / per_class_total[index]
+        for index in range(class_count)
+        if per_class_total[index] > 0
+    ]
+    return {
+        "loss": total_loss / max(total, 1),
+        "accuracy": correct / max(total, 1),
+        "macro_accuracy": sum(class_accuracies) / max(len(class_accuracies), 1),
+    }
 
 
 def train_model(
-    epochs: int = 3,
-    batch_size: int = 16,
+    epochs: int = 15,
+    batch_size: int = 32,
     learning_rate: float = 1e-3,
     save_path: str = "models/plant_disease_cnn.pth",
-    train_csv: str = "data/processed/train.csv",
-    device: Optional[str] = None
+    data_dir: str = "data/raw/PlantVillage",
+    mapping_path: str = "data/metadata/plantvillage_class_mapping.csv",
+    val_ratio: float = 0.15,
+    test_ratio: float = 0.15,
+    patience: int = 5,
+    seed: int = 42,
+    max_images_per_class: Optional[int] = None,
+    device: Optional[str] = None,
+    num_workers: int = 4,
 ) -> Dict[str, Any]:
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-
+    missing_dependencies = []
     if not HAS_TORCH:
-        print("PyTorch unavailable. Creating placeholder checkpoint info.")
-        return {"status": "skipped", "message": "PyTorch not available."}
+        missing_dependencies.append("torch")
+    if np is None:
+        missing_dependencies.append("numpy")
+    if Image is None:
+        missing_dependencies.append("Pillow")
+    if missing_dependencies:
+        return {
+            "status": "skipped",
+            "message": (
+                "Missing image-training dependencies: "
+                + ", ".join(missing_dependencies)
+                + ". Install NumPy and Pillow with: "
+                + ".venv\\Scripts\\python.exe -m pip install numpy pillow; install PyTorch from https://pytorch.org/get-started/locally/ for Windows/GPU."
+            ),
+        }
+    if epochs < 1 or batch_size < 2:
+        raise ValueError("epochs must be >= 1 and batch_size must be >= 2.")
+    if num_workers < 0:
+        raise ValueError("num_workers must be >= 0.")
 
-    if device is None:
-        device_obj = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    else:
-        device_obj = torch.device(device)
+    set_seed(seed)
+    mapping_file = Path(mapping_path)
+    if not mapping_file.is_absolute():
+        mapping_file = ROOT_DIR / mapping_file
+    image_root = Path(data_dir)
+    if not image_root.is_absolute():
+        image_root = ROOT_DIR / image_root
 
-    model = PlantDiseaseCNN(num_classes=38, embedding_dim=128).to(device_obj)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    mapping = load_class_mapping(mapping_file)
+    class_ids, images_by_id, missing_classes = discover_class_images(
+        image_root, mapping, max_images_per_class=max_images_per_class
+    )
+    train_records, val_records, test_records = split_images(
+        class_ids, images_by_id, val_ratio, test_ratio, seed
+    )
+    class_index_by_id = {class_id: index for index, class_id in enumerate(class_ids)}
+    remap = lambda records: [
+        (path, class_index_by_id[class_id]) for path, class_id in records
+    ]
 
-    x_train, y_train = load_dataset_from_csv(train_csv, num_samples=190)
-    dataset = torch.utils.data.TensorDataset(x_train, y_train)
-    loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    train_dataset = LeafImageDataset(remap(train_records), augment=True)
+    val_dataset = LeafImageDataset(remap(val_records), augment=False)
+    test_dataset = LeafImageDataset(remap(test_records), augment=False)
 
-    history = {"train_loss": [], "train_acc": []}
+    device_obj = torch.device(
+        device if device else ("cuda" if torch.cuda.is_available() else "cpu")
+    )
+    loader_options = {
+        "batch_size": batch_size,
+        "num_workers": num_workers,
+        "pin_memory": device_obj.type == "cuda",
+    }
+    worker_options = (
+        {"persistent_workers": True, "prefetch_factor": 2}
+        if num_workers > 0 else {}
+    )
+    drop_last = len(train_dataset) > batch_size and len(train_dataset) % batch_size == 1
+    train_loader = DataLoader(
+        train_dataset, shuffle=True, drop_last=drop_last, **loader_options, **worker_options
+    )
+    val_loader = DataLoader(val_dataset, shuffle=False, **loader_options, **worker_options)
+    test_loader = DataLoader(test_dataset, shuffle=False, **loader_options, **worker_options)
 
-    print(f"Starting PlantDiseaseCNN baseline training on device: {device_obj} for {epochs} epochs...")
+    counts = [sum(label == class_id for _, label in train_records) for class_id in class_ids]
+    weights = torch.tensor(
+        [len(train_records) / (len(class_ids) * count) for count in counts],
+        dtype=torch.float32,
+        device=device_obj,
+    )
+    weights = torch.clamp(weights, max=5.0)
+    weights = weights / weights.mean()
+
+    model = PlantDiseaseCNN(num_classes=len(class_ids), embedding_dim=128).to(device_obj)
+    criterion = nn.CrossEntropyLoss(weight=weights)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", factor=0.5, patience=2
+    )
+
+    output_path = Path(save_path)
+    if not output_path.is_absolute():
+        output_path = ROOT_DIR / output_path
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    best_state = None
+    best_macro_accuracy = -1.0
+    best_val_accuracy = 0.0
+    best_val_loss = float("inf")
+    epochs_without_improvement = 0
+    history: List[Dict[str, float]] = []
+
+    print(f"Training from {image_root}")
+    print(
+        f"Using {len(class_ids)}/{len(mapping)} classes and "
+        f"{len(train_records)} train, {len(val_records)} validation, "
+        f"{len(test_records)} test images on {device_obj}."
+    )
+    if missing_classes:
+        print("Classes without images (not trainable): " + ", ".join(missing_classes))
 
     for epoch in range(epochs):
         model.train()
         running_loss = 0.0
-        correct = 0
         total = 0
+        correct = 0
 
-        for images, labels in loader:
-            images, labels = images.to(device_obj), labels.to(device_obj)
-
-            optimizer.zero_grad()
+        for images, labels in train_loader:
+            images = images.to(device_obj, non_blocking=True)
+            labels = labels.to(device_obj, non_blocking=True)
+            optimizer.zero_grad(set_to_none=True)
             logits, _ = model(images)
             loss = criterion(logits, labels)
             loss.backward()
             optimizer.step()
 
-            running_loss += loss.item() * images.size(0)
-            _, predicted = logits.max(1)
-            total += labels.size(0)
-            correct += predicted.eq(labels).sum().item()
+            count = labels.size(0)
+            running_loss += float(loss.item()) * count
+            total += count
+            correct += int((logits.argmax(dim=1) == labels).sum().item())
 
-        epoch_loss = running_loss / total
-        epoch_acc = correct / total
-        history["train_loss"].append(epoch_loss)
-        history["train_acc"].append(epoch_acc)
+        train_metrics = {
+            "loss": running_loss / max(total, 1),
+            "accuracy": correct / max(total, 1),
+        }
+        val_metrics = evaluate(
+            model, val_loader, criterion, device_obj, class_count=len(class_ids)
+        )
+        scheduler.step(val_metrics["loss"])
+        epoch_metrics = {
+            "epoch": float(epoch + 1),
+            "train_loss": train_metrics["loss"],
+            "train_accuracy": train_metrics["accuracy"],
+            "val_loss": val_metrics["loss"],
+            "val_accuracy": val_metrics["accuracy"],
+            "val_macro_accuracy": val_metrics["macro_accuracy"],
+        }
+        history.append(epoch_metrics)
+        print(
+            f"Epoch {epoch + 1}/{epochs}: "
+            f"train_loss={train_metrics['loss']:.4f}, "
+            f"val_loss={val_metrics['loss']:.4f}, "
+            f"val_accuracy={val_metrics['accuracy']:.3f}, "
+            f"val_macro_accuracy={val_metrics['macro_accuracy']:.3f}"
+        )
 
-        print(f"Epoch [{epoch+1}/{epochs}] Loss: {epoch_loss:.4f} | Accuracy: {epoch_acc*100:.2f}%")
+        improved = (
+            val_metrics["macro_accuracy"] > best_macro_accuracy
+            or (
+                val_metrics["macro_accuracy"] == best_macro_accuracy
+                and val_metrics["loss"] < best_val_loss
+            )
+        )
+        if improved:
+            best_macro_accuracy = val_metrics["macro_accuracy"]
+            best_val_accuracy = val_metrics["accuracy"]
+            best_val_loss = val_metrics["loss"]
+            best_state = {
+                key: value.detach().cpu().clone()
+                for key, value in model.state_dict().items()
+            }
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
+            if epochs_without_improvement >= patience:
+                print(f"Early stopping after {epoch + 1} epochs.")
+                break
+
+    if best_state is None:
+        raise RuntimeError("Training did not produce a usable checkpoint.")
+    model.load_state_dict(best_state)
+    model.to(device_obj)
+    test_metrics = evaluate(
+        model, test_loader, criterion, device_obj, class_count=len(class_ids)
+    )
 
     checkpoint = {
-        "model_version": "vision_v1",
-        "num_classes": 38,
+        "model_version": "vision_image_trained_v2",
+        "trained_on_images": True,
+        "num_classes": len(class_ids),
+        "class_ids": class_ids,
+        "class_labels": [mapping[class_id]["original_label"] for class_id in class_ids],
         "embedding_dim": 128,
-        "state_dict": model.state_dict(),
-        "final_loss": history["train_loss"][-1],
-        "final_acc": history["train_acc"][-1]
+        "state_dict": best_state,
+        "final_acc": best_macro_accuracy,
+        "val_accuracy": best_val_accuracy,
+        "val_macro_accuracy": best_macro_accuracy,
+        "test_accuracy": test_metrics["accuracy"],
+        "test_macro_accuracy": test_metrics["macro_accuracy"],
+        "image_counts": {
+            str(class_id): len(images_by_id[class_id]) for class_id in class_ids
+        },
+        "split_counts": {
+            "train": len(train_records),
+            "val": len(val_records),
+            "test": len(test_records),
+        },
+        "missing_classes": missing_classes,
+        "history": history,
+        "seed": seed,
     }
-    torch.save(checkpoint, save_path)
-    
-    parent_models_dir = os.path.abspath(os.path.join(root_dir, "../models"))
-    if os.path.exists(parent_models_dir):
-        parent_save_path = os.path.join(parent_models_dir, "plant_disease_cnn.pth")
-        torch.save(checkpoint, parent_save_path)
-        print(f"Model checkpoint synced to parent path: {parent_save_path}")
+    temporary_path = output_path.with_suffix(output_path.suffix + ".tmp")
+    torch.save(checkpoint, temporary_path)
+    os.replace(temporary_path, output_path)
 
-    print(f"Model checkpoint saved successfully to: {save_path}")
+    report_path = ROOT_DIR / "reports" / "training_report.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report = {key: value for key, value in checkpoint.items() if key != "state_dict"}
+    report["checkpoint_path"] = str(output_path)
+    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
+    print(f"Checkpoint saved to {output_path}")
+    print(
+        f"Test accuracy: {test_metrics['accuracy']:.3f}; "
+        f"test macro accuracy: {test_metrics['macro_accuracy']:.3f}"
+    )
     return {
         "status": "success",
-        "save_path": save_path,
-        "final_loss": history["train_loss"][-1],
-        "final_acc": history["train_acc"][-1]
+        "save_path": str(output_path),
+        "num_classes": len(class_ids),
+        "missing_classes": missing_classes,
+        "val_macro_accuracy": best_macro_accuracy,
+        "test_accuracy": test_metrics["accuracy"],
+        "test_macro_accuracy": test_metrics["macro_accuracy"],
     }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Train PlantDiseaseCNN on the extracted PlantVillage image folders."
+    )
+    parser.add_argument("--epochs", type=int, default=15)
+    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--num-workers", type=int, default=4, help="Parallel image-loading workers; set 0 to disable.")
+    parser.add_argument("--learning-rate", type=float, default=1e-3)
+    parser.add_argument("--data-dir", default="data/raw/PlantVillage")
+    parser.add_argument(
+        "--mapping", default="data/metadata/plantvillage_class_mapping.csv"
+    )
+    parser.add_argument("--output", default="models/plant_disease_cnn.pth")
+    parser.add_argument("--val-ratio", type=float, default=0.15)
+    parser.add_argument("--test-ratio", type=float, default=0.15)
+    parser.add_argument("--patience", type=int, default=5)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--max-images-per-class",
+        type=int,
+        default=None,
+        help="Optional cap per class for a quick trial; omit for full training.",
+    )
+    parser.add_argument("--device", default=None, help="Optional torch device, e.g. cpu or cuda")
+    args = parser.parse_args()
+
+    result = train_model(
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        learning_rate=args.learning_rate,
+        save_path=args.output,
+        data_dir=args.data_dir,
+        mapping_path=args.mapping,
+        val_ratio=args.val_ratio,
+        test_ratio=args.test_ratio,
+        patience=args.patience,
+        seed=args.seed,
+        max_images_per_class=args.max_images_per_class,
+        device=args.device,
+        num_workers=args.num_workers,
+    )
+    if result["status"] != "success":
+        raise SystemExit(result.get("message", "Training did not complete."))
 
 
 if __name__ == "__main__":
-    train_model(epochs=3)
+    main()

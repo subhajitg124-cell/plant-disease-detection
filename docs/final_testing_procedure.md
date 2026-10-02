@@ -1,83 +1,50 @@
-# Final Testing & Evaluation Procedure (Standard Operating Procedure)
+# Plant Disease Model Training and Evaluation
 
-> **Milestone**: Sprint 10 Deliverable — Finalized Testing Procedure  
-> **Applicability**: Unseen dataset final evaluation, baseline regression testing, and production deployment audit.
+## 1. Prepare and inspect the image folders
 
----
+The CNN reads color images from:
 
-## 1. Scope and Prerequisites
+    data/raw/PlantVillage/<original_label>/
 
-This procedure outlines the exact steps to evaluate both the baseline 38-class system and the rapidly adapted unseen-dataset pipeline.
+Class labels and IDs come from:
 
-### Prerequisites:
-- Python 3.10+ virtual environment (`.venv\Scripts\python.exe`)
-- Model weights: `models/plant_disease_cnn.pth`
-- Vector Store Index: `models/vector_index/`
-- Agricultural Knowledge Base: `data/knowledge_base/agricultural_documents.json`
+    data/metadata/plantvillage_class_mapping.csv
 
----
+The current extracted dataset contains 31 of the 38 mapped classes. The trainer records that subset in the checkpoint; absent classes are not advertised as trained classes. Add the seven missing class folders before training if the project must cover all 38 diseases.
 
-## 2. Standard Testing Steps
+To create reproducible CSV manifests of the real image paths, run from the project root:
 
-### Step 1: Baseline Freeze & Integrity Check
-Before running any unseen evaluation, assert that the frozen baseline components have not undergone unauthorized alterations.
+    .\.venv\Scripts\python.exe scripts/prepare_dataset.py
 
-```bash
-# Verify cryptographic hashes against frozen baseline manifest
-python -c "from src.adaptation.baseline_freeze import BaselineFreezer; freezer = BaselineFreezer(); valid, mismatches = freezer.verify_integrity(); print('Integrity OK' if valid else mismatches); exit(0 if valid else 1)"
-```
+## 2. Train and evaluate on real images
 
-### Step 2: Automated Unit & Scenario Regression Tests
-Ensure all 138 unit, integration, and scenario tests pass cleanly.
+Make sure the project environment has NumPy and Pillow, and install a PyTorch build selected for Windows and your GPU from https://pytorch.org/get-started/locally/. Then run from the project root:
 
-```bash
-# Execute full test discovery suite
-python -m unittest discover -s tests -p "test_*.py"
-```
+    .\.venv\Scripts\python.exe -m pip install numpy pillow
+    .\.venv\Scripts\python.exe -m src.vision.train --epochs 15 --batch-size 32
 
-Expected output: `Ran 138 tests ... OK`
+The trainer makes a deterministic, stratified 70/15/15 train, validation, and test split. It saves the best validation checkpoint to models/plant_disease_cnn.pth and writes metrics to reports/training_report.json. Test accuracy is calculated from the held-out images; it is not inferred from training accuracy or generated sample images.
 
-### Step 3: Run Baseline Known-Dataset Evaluation
-Execute quantitative metric evaluation across the 38 canonical classes.
+For an independent evaluation of the same held-out image split, run:
 
-```bash
-python scripts/evaluate_known_dataset.py
-```
+    .\.venv\Scripts\python.exe scripts/evaluate_known_dataset.py
 
-Outputs produced:
-- `reports/baseline_evaluation_report.json`
-- `reports/baseline_evaluation_report.md`
+This writes reports/plantvillage_test_report.json and reports/plantvillage_test_report.md. The report includes per-class accuracy and the classes absent from the image set.
 
-### Step 4: Run CPU Inference Latency Benchmarking
-Benchmark the end-to-end processing pipeline across 100 sample iterations.
+## 3. Try the web application
 
-```bash
-python scripts/benchmark_performance.py
-```
+Start the server:
 
-Outputs produced:
-- `reports/benchmark_report.json`
+    .\.venv\Scripts\python.exe server.py
 
-### Step 5: Execute Unseen Dataset Rapid Adaptation
-Ingest unseen crop support sets, register visual prototype centroids, update the RAG vector store, and evaluate query predictions.
+Open http://localhost:8000 and upload a real leaf photograph. Check http://localhost:8000/api/health for checkpoint and trained-class status. Sample illustrations are previews only and are not model predictions.
 
-```bash
-python scripts/adapt_unseen_dataset.py
-```
+If no real-image checkpoint is available, the API reports that the model is not ready rather than returning a heuristic or hard-coded diagnosis.
 
-Outputs produced:
-- `reports/unseen_adaptation_results.json`
-- `reports/unseen_adaptation_report.md`
+## 4. Automated code checks
 
----
+Run the unit and integration suite from the project root:
 
-## 3. Evaluation Acceptance Criteria
+    .\.venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py"
 
-| Criteria | Target Threshold | Validation Script |
-| :--- | :--- | :--- |
-| **Integrity Check** | Zero Hash Mismatches | `src/adaptation/baseline_freeze.py` |
-| **Unit Test Suite** | $138 / 138$ (100% Passing) | `unittest discover` |
-| **End-to-End CPU Latency** | $< 35\text{ ms / image}$ | `scripts/benchmark_performance.py` |
-| **Known-Data Top-1 Accuracy** | $\ge 85\%$ | `scripts/evaluate_known_dataset.py` |
-| **Unseen Adaptation Accuracy** | $\ge 80\%$ (5-shot prototype) | `scripts/adapt_unseen_dataset.py` |
-| **Grounding Verification** | Actionable Prevention & Management | `src/retrieval/rag_retriever.py` |
+These checks cover application code. Use the held-out image report above to assess classification performance.
