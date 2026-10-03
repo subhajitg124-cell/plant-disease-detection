@@ -4,9 +4,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PhytoScan AI - Plant Disease Detection</title>
+  <title>PatraDristi AI - Plant Disease Detection &amp; Foliar Diagnostics</title>
   <meta name="description"
-    content="AI-powered plant disease detection. Upload a leaf photo to get instant diagnosis and treatment advice." />
+    content="PatraDristi AI - Computer Vision & RAG powered plant disease detection. Upload a leaf photo to get instant diagnosis and expert treatment guidance." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
@@ -20,13 +20,31 @@
   <nav id="navbar">
     <div class="nav-inner">
       <div class="nav-brand">
-        <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
-          <circle cx="20" cy="20" r="16" stroke="#22c55e" stroke-width="1.5" opacity="0.4" />
-          <path d="M14 20c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="#4ade80" stroke-width="2" stroke-linecap="round" />
-          <path d="M20 14v12" stroke="#4ade80" stroke-width="1.5" stroke-linecap="round" />
-          <circle cx="20" cy="20" r="3" fill="#22c55e" />
+        <svg class="brand-logo" width="32" height="32" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="pd-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#4ade80" />
+              <stop offset="100%" stop-color="#16a34a" />
+            </linearGradient>
+            <filter id="pd-glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="1.5" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+          <!-- Outer Optical Vision Aperture (Dristi) -->
+          <circle cx="20" cy="20" r="17.5" stroke="url(#pd-grad)" stroke-width="1.8" stroke-dasharray="4 2.5" opacity="0.7" />
+          <circle cx="20" cy="20" r="13" stroke="#22c55e" stroke-width="1" opacity="0.35" />
+          <!-- Stylized Leaf (Patra) + Optical Eye Curve -->
+          <path d="M20 6C28.5 12.5 31.5 22 20 34C8.5 22 11.5 12.5 20 6Z" fill="url(#pd-grad)" opacity="0.92" filter="url(#pd-glow)" />
+          <!-- Central Vein / Vision Focus Axis -->
+          <path d="M20 9V31" stroke="#041f0f" stroke-width="2" stroke-linecap="round" />
+          <path d="M20 15L25.5 12.5" stroke="#041f0f" stroke-width="1.5" stroke-linecap="round" />
+          <path d="M20 21L14.5 18.5" stroke="#041f0f" stroke-width="1.5" stroke-linecap="round" />
+          <path d="M20 26L25 24" stroke="#041f0f" stroke-width="1.5" stroke-linecap="round" />
+          <!-- Pupil / Focal AI Lens -->
+          <circle cx="20" cy="20" r="2.8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.2" />
         </svg>
-        <span>PhytoScan <span class="brand-ai">AI</span></span>
+        <span>PatraDristi <span class="brand-ai">AI</span></span>
       </div>
 
       <div class="nav-right">
@@ -44,12 +62,12 @@
           <span class="pill-counter" id="scan-counter-badge">0</span>
         </button>
 
-        <!-- User Profile Trigger -->
-        <button class="nav-user-profile" id="profile-btn" type="button" aria-label="Open User Profile & Preferences">
-          <div class="user-avatar" id="nav-user-avatar">&#x1F468;&#x200D;&#x1F33E;</div>
+        <!-- User / Auth Profile Trigger -->
+        <button class="nav-user-profile" id="profile-btn" type="button" aria-label="Open Account & Preferences">
+          <div class="user-avatar" id="nav-user-avatar">&#x1F464;</div>
           <div class="user-meta">
-            <span class="user-name" id="nav-user-name">Subhajit Ghosh</span>
-            <span class="user-role" id="nav-user-role">Agronomist &bull; Crop Doctor</span>
+            <span class="user-name" id="nav-user-name">Login / Sign Up</span>
+            <span class="user-role" id="nav-user-role">Guest Mode &bull; Preferences</span>
           </div>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M6 9l6 6 6-6"/>
@@ -330,265 +348,175 @@
     </div>
   </main>
 
-  <!-- ── USER PROFILE MODAL ── -->
+  <!-- ── PATRADRISTI ACCOUNT & PROFILE MODAL ── -->
   <div id="profile-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="profile-title">
     <div class="modal-card">
       <div class="modal-header">
         <div class="modal-title-wrap">
-          <span class="modal-icon">&#x1F468;&#x200D;&#x1F33E;</span>
+          <span class="modal-icon">&#x1F464;</span>
           <div>
-            <h3 id="profile-title">Farmer &amp; Agronomist Profile</h3>
-            <p class="modal-sub">Customize your farm identity, crop monitoring preferences, and diagnostic alerts.</p>
+            <h3 id="profile-title">PatraDristi Account &amp; Preferences</h3>
+            <p class="modal-sub">Manage your login status, cloud sync, and field crop diagnostic preferences.</p>
           </div>
         </div>
         <button class="modal-close-btn" id="close-profile-btn" aria-label="Close Profile Modal">&times;</button>
       </div>
 
-      <div class="modal-body">
-        <!-- Farm Health Stats -->
-        <div class="profile-stats-grid">
-          <div class="pstat-card">
-            <span class="pstat-val" id="pstat-scans">0</span>
-            <span class="pstat-label">Total Leaf Scans</span>
-          </div>
-          <div class="pstat-card">
-            <span class="pstat-val" id="pstat-health-rate">100%</span>
-            <span class="pstat-label">Healthy Leaf Rate</span>
-          </div>
-          <div class="pstat-card">
-            <span class="pstat-val" id="pstat-diseases-caught">0</span>
-            <span class="pstat-label">Diseases Caught</span>
-          </div>
-          <div class="pstat-card">
-            <span class="pstat-val" id="pstat-saved-reports">0</span>
-            <span class="pstat-label">Field Diary Logs</span>
-          </div>
-        </div>
-
-        <form id="profile-form" class="profile-form" onsubmit="return false;">
-          <div class="form-row-2">
-            <div class="form-group">
-              <label for="prof-name">Full Name</label>
-              <input type="text" id="prof-name" class="form-input" value="Subhajit Ghosh" placeholder="e.g. Subhajit Ghosh" />
-            </div>
-            <div class="form-group">
-              <label for="prof-role">Professional Role</label>
-              <select id="prof-role" class="form-input">
-                <option value="Agronomist • Crop Doctor" selected>Agronomist &bull; Crop Doctor</option>
-                <option value="Commercial Farm Operator">Commercial Farm Operator</option>
-                <option value="Organic Farmer">Organic Farmer</option>
-                <option value="Vineyard Specialist">Vineyard Specialist</option>
-                <option value="Agricultural Researcher">Agricultural Researcher</option>
-                <option value="Home & Greenhouse Gardener">Home &amp; Greenhouse Gardener</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-row-2">
-            <div class="form-group">
-              <label for="prof-farm">Farm / Orchard Name</label>
-              <input type="text" id="prof-farm" class="form-input" value="Green Valley Agricultural Estate" placeholder="e.g. Green Valley Farm" />
-            </div>
-            <div class="form-group">
-              <label for="prof-location">Region &amp; Climate Zone</label>
-              <input type="text" id="prof-location" class="form-input" value="Subtropical &amp; Humid Plains" placeholder="e.g. Temperate / Mediterranean" />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Primary Monitored Crops</label>
-            <div class="crop-tags-grid" id="crop-tags-container">
-              <label class="crop-tag"><input type="checkbox" name="crops" value="Tomato" checked /><span>&#x1F345; Tomato</span></label>
-              <label class="crop-tag"><input type="checkbox" name="crops" value="Apple" checked /><span>&#x1F34E; Apple</span></label>
-              <label class="crop-tag"><input type="checkbox" name="crops" value="Corn" checked /><span>&#x1F33D; Corn</span></label>
-              <label class="crop-tag"><input type="checkbox" name="crops" value="Potato" checked /><span>&#x1F954; Potato</span></label>
-              <label class="crop-tag"><input type="checkbox" name="crops" value="Grape" checked /><span>&#x1F347; Grape</span></label>
-              <label class="crop-tag"><input type="checkbox" name="crops" value="Bell Pepper" checked /><span>&#x1FAD1; Bell Pepper</span></label>
-              <label class="crop-tag"><input type="checkbox" name="crops" value="Strawberry" /><span>&#x1F353; Strawberry</span></label>
-              <label class="crop-tag"><input type="checkbox" name="crops" value="Peach" /><span>&#x1F351; Peach</span></label>
-              <label class="crop-tag"><input type="checkbox" name="crops" value="Cherry" /><span>&#x1F352; Cherry</span></label>
-              <label class="crop-tag"><input type="checkbox" name="crops" value="Soybean" /><span>&#x1F33F; Soybean</span></label>
-              <label class="crop-tag"><input type="checkbox" name="crops" value="Blueberry" /><span>&#x1FAD0; Blueberry</span></label>
-              <label class="crop-tag"><input type="checkbox" name="crops" value="Orange" /><span>&#x1F34A; Orange</span></label>
-            </div>
-          </div>
-
-          <div class="form-row-2">
-            <div class="form-group">
-              <label for="prof-organic-pref">Treatment Philosophy</label>
-              <select id="prof-organic-pref" class="form-input">
-                <option value="organic-first" selected>Organic &amp; Biological First</option>
-                <option value="ipm">Integrated Pest Management (IPM)</option>
-                <option value="conventional">Conventional &amp; Fast-Acting</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="prof-threshold">Confidence Alert Floor</label>
-              <select id="prof-threshold" class="form-input">
-                <option value="60">60% Confidence (Standard)</option>
-                <option value="75" selected>75% Confidence (Recommended)</option>
-                <option value="90">90% Confidence (Strict)</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="modal-footer">
-            <button class="btn-ghost btn-sm" id="reset-profile-btn" type="button">Reset Defaults</button>
-            <button class="btn-primary btn-sm" id="save-profile-btn" type="button">Save Profile Changes</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── FIELD DIARY / SCAN HISTORY MODAL ── -->
-  <div id="history-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="history-title">
-    <div class="modal-card modal-card-wide">
-      <div class="modal-header">
-        <div class="modal-title-wrap">
-          <span class="modal-icon">&#x1F4D6;</span>
-          <div>
-            <h3 id="history-title">Field Diary &amp; Scan History</h3>
-            <p class="modal-sub">Historical crop diagnoses, disease progression records, and field findings.</p>
-          </div>
-        </div>
-        <button class="modal-close-btn" id="close-history-btn" aria-label="Close History Modal">&times;</button>
-      </div>
-
-      <div class="history-controls">
-        <div class="history-search-wrap">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-          </svg>
-          <input type="text" id="history-search" class="history-search-input" placeholder="Search by crop, disease, or pathogen..." />
-        </div>
-        <div class="history-filters">
-          <button class="history-filter-btn active" data-filter="all">All</button>
-          <button class="history-filter-btn" data-filter="diseased">Diseased</button>
-          <button class="history-filter-btn" data-filter="healthy">Healthy</button>
-        </div>
-        <div class="history-actions-bar">
-          <button class="btn-outline btn-sm" id="export-history-btn" type="button">Export Logs (JSON)</button>
-          <button class="btn-ghost btn-sm text-danger" id="clear-history-btn" type="button">Clear Diary</button>
-        </div>
+      <!-- Account Modal Sub-tabs -->
+      <div class="account-tabs">
+        <button class="account-tab-btn active" id="tab-btn-auth" data-tab="auth">
+          <span>&#x1F510;</span> Login / Sign Up
+          <span class="auth-future-tag">Roadmap</span>
+        </button>
+        <button class="account-tab-btn" id="tab-btn-pref" data-tab="pref">
+          <span>&#x1F331;</span> Field Preferences
+        </button>
       </div>
 
       <div class="modal-body">
-        <div id="history-list" class="history-grid">
-          <!-- Populated dynamically via JS -->
+
+        <!-- ── TAB 1: LOGIN / SIGN UP (FUTURE WORK) ── -->
+        <div id="account-tab-panel-auth" class="account-tab-panel active">
+          <div class="auth-future-notice">
+            <div class="notice-icon">&#x26A1;</div>
+            <div class="notice-text">
+              <strong>Future Capability Preview:</strong> Cloud User Accounts, multi-device leaf synchronization, and Agronomist team sharing are in active development.
+              You can preview the interface below or continue in offline <strong>Guest Agronomist Mode</strong>.
+            </div>
+          </div>
+
+          <div class="auth-box">
+            <div class="auth-toggle-row">
+              <button class="auth-switch-btn active" id="auth-mode-login" type="button">Sign In</button>
+              <button class="auth-switch-btn" id="auth-mode-signup" type="button">Create Account</button>
+            </div>
+
+            <form id="auth-demo-form" class="auth-form" onsubmit="return false;">
+              <div class="form-group">
+                <label for="auth-email">Email Address</label>
+                <input type="email" id="auth-email" class="form-input" placeholder="agronomist@farmdomain.com" />
+              </div>
+
+              <div class="form-group">
+                <label for="auth-password">Password</label>
+                <input type="password" id="auth-password" class="form-input" placeholder="••••••••" />
+              </div>
+
+              <div class="auth-actions">
+                <button class="btn-primary" id="auth-submit-btn" type="button" style="width: 100%;">
+                  Sign In to PatraDristi AI
+                </button>
+                <button class="btn-ghost btn-sm" id="auth-guest-btn" type="button" style="width: 100%; margin-top: 6px;">
+                  Continue in Guest Mode
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-        <div id="history-empty" class="history-empty hidden">
-          <div class="empty-icon">&#x1F33F;</div>
-          <p class="empty-title">No Scans Recorded Yet</p>
-          <p class="empty-sub">When you diagnose leaves or click "Save to Diary", your findings will appear here with full advisories.</p>
+
+        <!-- ── TAB 2: FIELD PREFERENCES & STATS ── -->
+        <div id="account-tab-panel-pref" class="account-tab-panel hidden">
+          <!-- Farm Health Stats -->
+          <div class="profile-stats-grid">
+            <div class="pstat-card">
+              <span class="pstat-val" id="pstat-scans">0</span>
+              <span class="pstat-label">Total Leaf Scans</span>
+            </div>
+            <div class="pstat-card">
+              <span class="pstat-val" id="pstat-health-rate">100%</span>
+              <span class="pstat-label">Healthy Foliage Rate</span>
+            </div>
+            <div class="pstat-card">
+              <span class="pstat-val" id="pstat-diseases-caught">0</span>
+              <span class="pstat-label">Diseases Caught</span>
+            </div>
+            <div class="pstat-card">
+              <span class="pstat-val" id="pstat-saved-reports">0</span>
+              <span class="pstat-label">Field Diary Logs</span>
+            </div>
+          </div>
+
+          <form id="profile-form" class="profile-form" onsubmit="return false;">
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="prof-name">Display Name</label>
+                <input type="text" id="prof-name" class="form-input" placeholder="e.g. Guest Agronomist" />
+              </div>
+              <div class="form-group">
+                <label for="prof-role">Professional Role</label>
+                <select id="prof-role" class="form-input">
+                  <option value="Agronomist • Crop Doctor" selected>Agronomist &bull; Crop Doctor</option>
+                  <option value="Commercial Farm Operator">Commercial Farm Operator</option>
+                  <option value="Organic Farmer">Organic Farmer</option>
+                  <option value="Vineyard Specialist">Vineyard Specialist</option>
+                  <option value="Agricultural Researcher">Agricultural Researcher</option>
+                  <option value="Home & Greenhouse Gardener">Home &amp; Greenhouse Gardener</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="prof-farm">Farm / Orchard Name</label>
+                <input type="text" id="prof-farm" class="form-input" placeholder="e.g. Green Valley Farm" />
+              </div>
+              <div class="form-group">
+                <label for="prof-location">Region &amp; Climate Zone</label>
+                <input type="text" id="prof-location" class="form-input" placeholder="e.g. Subtropical / Temperate" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Primary Monitored Crops</label>
+              <div class="crop-tags-grid" id="crop-tags-container">
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Tomato" checked /><span>&#x1F345; Tomato</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Apple" checked /><span>&#x1F34E; Apple</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Corn" checked /><span>&#x1F33D; Corn</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Potato" checked /><span>&#x1F954; Potato</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Grape" checked /><span>&#x1F347; Grape</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Bell Pepper" checked /><span>&#x1FAD1; Bell Pepper</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Strawberry" /><span>&#x1F353; Strawberry</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Peach" /><span>&#x1F351; Peach</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Cherry" /><span>&#x1F352; Cherry</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Soybean" /><span>&#x1F33F; Soybean</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Blueberry" /><span>&#x1FAD0; Blueberry</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Orange" /><span>&#x1F34A; Orange</span></label>
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="prof-organic-pref">Treatment Philosophy</label>
+                <select id="prof-organic-pref" class="form-input">
+                  <option value="organic-first" selected>Organic &amp; Biological First</option>
+                  <option value="ipm">Integrated Pest Management (IPM)</option>
+                  <option value="conventional">Conventional &amp; Fast-Acting</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="prof-threshold">Confidence Alert Floor</label>
+                <select id="prof-threshold" class="form-input">
+                  <option value="60">60% Confidence (Standard)</option>
+                  <option value="75" selected>75% Confidence (Recommended)</option>
+                  <option value="90">90% Confidence (Strict)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="modal-footer">
+              <button class="btn-ghost btn-sm" id="reset-profile-btn" type="button">Reset Defaults</button>
+              <button class="btn-primary btn-sm" id="save-profile-btn" type="button">Save Profile Changes</button>
+            </div>
+          </form>
         </div>
-      </div>
-    </div>
-  </div>
 
-  <!-- ── FUTURE AI LAB & ROADMAP MODAL ── -->
-  <div id="future-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="future-title">
-    <div class="modal-card modal-card-wide">
-      <div class="modal-header">
-        <div class="modal-title-wrap">
-          <span class="modal-icon">&#x2728;</span>
-          <div>
-            <h3 id="future-title">Future AI Lab &bull; Agricultural Roadmap</h3>
-            <p class="modal-sub">Next-generation features in development for precision crop disease prevention and field automation.</p>
-          </div>
-        </div>
-        <button class="modal-close-btn" id="close-future-btn" aria-label="Close Future Modal">&times;</button>
-      </div>
-
-      <div class="modal-body">
-        <div class="roadmap-grid">
-
-          <div class="roadmap-card">
-            <div class="roadmap-badge ready">&#x1F680; In Development</div>
-            <div class="roadmap-icon">&#x26C5;</div>
-            <h4>Microclimate Spore Risk Forecaster</h4>
-            <p>Predicts fungal and bacterial outbreak risk 48 hours in advance by cross-referencing local humidity, temperature fluctuations, and dew point.</p>
-            <div class="roadmap-tags">
-              <span>Weather API</span><span>Spore Modeling</span><span>Early Warning</span>
-            </div>
-            <button class="btn-outline btn-xs roadmap-vote-btn" data-feature="Microclimate Risk Forecaster">
-              &#x1F44D; Request Early Beta
-            </button>
-          </div>
-
-          <div class="roadmap-card">
-            <div class="roadmap-badge prototype">&#x1F6F0; Prototype</div>
-            <div class="roadmap-icon">&#x1F681;</div>
-            <h4>Drone &amp; Multi-Spectral Canopy Imaging</h4>
-            <p>Upload aerial DJI Agras / Parrot drone multispectral geotiffs. The AI detects NDVI vegetative index anomalies and pinpoints disease hot zones across entire fields.</p>
-            <div class="roadmap-tags">
-              <span>NDVI Analysis</span><span>GIS Mapping</span><span>Precision Spraying</span>
-            </div>
-            <button class="btn-outline btn-xs roadmap-vote-btn" data-feature="Drone Canopy Imaging">
-              &#x1F44D; Request Early Beta
-            </button>
-          </div>
-
-          <div class="roadmap-card">
-            <div class="roadmap-badge research">&#x1F9EA; Research Phase</div>
-            <div class="roadmap-icon">&#x1F9EA;</div>
-            <h4>Soil Nutrient &amp; N-P-K Deficiency Linker</h4>
-            <p>Correlates foliar chlorosis and leaf curl with soil test data. Generates precise organic fertilizer formulations to cure root and nutrient imbalances.</p>
-            <div class="roadmap-tags">
-              <span>Soil Chemistry</span><span>N-P-K Balancer</span><span>pH Correction</span>
-            </div>
-            <button class="btn-outline btn-xs roadmap-vote-btn" data-feature="Soil Nutrient Linker">
-              &#x1F44D; Request Early Beta
-            </button>
-          </div>
-
-          <div class="roadmap-card">
-            <div class="roadmap-badge ready">&#x1F4F1; In Development</div>
-            <div class="roadmap-icon">&#x1F4F6;</div>
-            <h4>Offline Edge-AI PWA Mode</h4>
-            <p>On-device WebAssembly and ONNX quantized vision models that run in offline rural fields with zero cellular connectivity.</p>
-            <div class="roadmap-tags">
-              <span>WebAssembly</span><span>ONNX Edge</span><span>Offline Sync</span>
-            </div>
-            <button class="btn-outline btn-xs roadmap-vote-btn" data-feature="Offline Edge-AI Mode">
-              &#x1F44D; Request Early Beta
-            </button>
-          </div>
-
-          <div class="roadmap-card">
-            <div class="roadmap-badge prototype">&#x1F310; Prototype</div>
-            <div class="roadmap-icon">&#x1F5E3;&#xFE0F;</div>
-            <h4>Multilingual Voice Agronomist</h4>
-            <p>Real-time conversational voice assistant supporting regional agricultural dialects (Hindi, Bengali, Spanish, Punjabi, Swahili) with voice-guided spray steps.</p>
-            <div class="roadmap-tags">
-              <span>Speech-to-Text</span><span>12+ Languages</span><span>Hands-free</span>
-            </div>
-            <button class="btn-outline btn-xs roadmap-vote-btn" data-feature="Multilingual Voice Agronomist">
-              &#x1F44D; Request Early Beta
-            </button>
-          </div>
-
-          <div class="roadmap-card">
-            <div class="roadmap-badge research">&#x1F91D; Planned</div>
-            <div class="roadmap-icon">&#x1F9D1;&#x200D;&#x2695;&#xFE0F;</div>
-            <h4>Verified Agronomist Tele-Consult</h4>
-            <p>One-click escalation to certified regional crop specialists and university agricultural extension officers with attached AI diagnostic dossiers.</p>
-            <div class="roadmap-tags">
-              <span>Tele-Consult</span><span>Certified Doctors</span><span>Govt Extension</span>
-            </div>
-            <button class="btn-outline btn-xs roadmap-vote-btn" data-feature="Agronomist Tele-Consult">
-              &#x1F44D; Request Early Beta
-            </button>
-          </div>
-
-        </div>
       </div>
     </div>
   </div>
 
   <!-- FOOTER -->
   <footer class="footer">
-    <p>PhytoScan AI &mdash; CNN + RAG Plant Disease Detection &middot; 38 classes &middot; 14 crops &middot;
+    <p>PatraDristi AI &mdash; CNN + RAG Plant Disease Detection &middot; 38 classes &middot; 14 crops &middot;
       PlantVillage Dataset</p>
   </footer>
 
