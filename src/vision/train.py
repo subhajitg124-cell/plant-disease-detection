@@ -16,7 +16,35 @@ import random
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union, TYPE_CHECKING
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+if TYPE_CHECKING:
+    from torch.utils.data import Dataset, DataLoader
+    import torch
+    import torch.nn as nn
+    from src.vision.model import PlantDiseaseCNN
+    HAS_TORCH: bool = True
+else:
+    try:
+        import torch
+        import torch.nn as nn
+        from torch.utils.data import DataLoader, Dataset
+        HAS_TORCH = True
+    except ImportError:
+        torch = None
+        nn = None
+        DataLoader = None
+        Dataset = object
+        HAS_TORCH = False
+
+    if HAS_TORCH:
+        from src.vision.model import PlantDiseaseCNN
+    else:
+        PlantDiseaseCNN = None
 
 try:
     import numpy as np
@@ -27,37 +55,44 @@ try:
 except ImportError:
     Image = None
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
-try:
-    import torch
-    import torch.nn as nn
-    from torch.utils.data import DataLoader, Dataset
-    HAS_TORCH = True
-except ImportError:
-    torch = None
-    nn = None
-    DataLoader = None
-    Dataset = object
-    HAS_TORCH = False
-
-if HAS_TORCH:
-    from src.vision.model import PlantDiseaseCNN
-else:
-    PlantDiseaseCNN = None
-
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
+
+try:
+    import torchvision.transforms as transforms
+    HAS_TORCHVISION = True
+except ImportError:
+    transforms = None
+    HAS_TORCHVISION = False
 
 from src.dataset_index import discover_class_images, load_class_mapping, split_images
 
 class LeafImageDataset(Dataset):
     def __init__(self, records: Sequence[Tuple[Path, int]], augment: bool = False):
         self.records = list(records)
-        from src.preprocessing.image_transforms import ImageTransformer
-        self.transformer = ImageTransformer(target_size=(224, 224), augment=augment)
+        self.augment = augment
+        if HAS_TORCHVISION and transforms is not None:
+            if augment:
+                self.transform = transforms.Compose([
+                    transforms.Resize((224, 224), interpolation=transforms.InterpolationMode.BILINEAR),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.RandomVerticalFlip(),
+                    transforms.RandomRotation(15),
+                    transforms.ColorJitter(brightness=0.1, contrast=0.1),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                ])
+            else:
+                self.transform = transforms.Compose([
+                    transforms.Resize((224, 224), interpolation=transforms.InterpolationMode.BILINEAR),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                ])
+            self.transformer = None
+        else:
+            self.transform = None
+            from src.preprocessing.image_transforms import ImageTransformer
+            self.transformer = ImageTransformer(target_size=(224, 224), augment=augment)
 
     def __len__(self) -> int:
         return len(self.records)
@@ -67,12 +102,15 @@ class LeafImageDataset(Dataset):
         try:
             with Image.open(path) as source:
                 image = source.convert("RGB")
-            array = self.transformer.transform(image, return_tensor=False)
+            if self.transform is not None:
+                tensor = self.transform(image)
+            else:
+                array = self.transformer.transform(image, return_tensor=False)
+                tensor = torch.from_numpy(np.asarray(array, dtype=np.float32).copy())
         except Exception as error:
             raise RuntimeError(f"Could not load training image {path}: {error}") from error
 
-        tensor = torch.from_numpy(np.asarray(array, dtype=np.float32).copy())
-        return tensor, int(class_index)
+        return tensor, class_index
 
 
 def set_seed(seed: int) -> None:
@@ -139,7 +177,7 @@ def train_model(
     seed: int = 42,
     max_images_per_class: Optional[int] = None,
     device: Optional[str] = None,
-    num_workers: int = 4,
+    num_workers: int = 0,
 ) -> Dict[str, Any]:
     missing_dependencies = []
     if not HAS_TORCH:
@@ -353,6 +391,12 @@ def train_model(
     report["checkpoint_path"] = str(output_path)
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
+    parent_models = ROOT_DIR.parent / "models"
+    if parent_models.exists() and parent_models.is_dir():
+        import shutil
+        shutil.copy2(output_path, parent_models / output_path.name)
+        print(f"Synced checkpoint to parent workspace: {parent_models / output_path.name}")
+
     print(f"Checkpoint saved to {output_path}")
     print(
         f"Test accuracy: {test_metrics['accuracy']:.3f}; "
@@ -374,8 +418,8 @@ def main() -> None:
         description="Train PlantDiseaseCNN on the extracted PlantVillage image folders."
     )
     parser.add_argument("--epochs", type=int, default=15)
-    parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--num-workers", type=int, default=4, help="Parallel image-loading workers; set 0 to disable.")
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--num-workers", type=int, default=0, help="Parallel image-loading workers; 0 for Windows.")
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--data-dir", default="data/raw/PlantVillage")
     parser.add_argument(
