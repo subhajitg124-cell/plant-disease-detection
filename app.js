@@ -2303,3 +2303,362 @@ document.getElementById('new-analysis-btn')?.addEventListener('click', () => {
   document.getElementById('results-empty')?.classList.remove('hidden');
   showToast('Workspace reset — ready for new leaf analysis', 'info', 2000);
 });
+
+// ─── USER PROFILE & FARM PREFERENCES SYSTEM ──────────────────────────────────
+const DEFAULT_PROFILE = {
+  name: 'Subhajit Ghosh',
+  role: 'Agronomist • Crop Doctor',
+  avatar: '👨‍🌾',
+  farm: 'Green Valley Agricultural Estate',
+  location: 'Subtropical & Humid Plains',
+  crops: ['Tomato', 'Apple', 'Corn', 'Potato', 'Grape', 'Bell Pepper'],
+  philosophy: 'organic-first',
+  threshold: 75,
+  totalScans: 0,
+  healthyScans: 0,
+  diseasedScans: 0
+};
+
+function getUserProfile() {
+  try {
+    const raw = localStorage.getItem('phytoscan_user_profile');
+    if (raw) return { ...DEFAULT_PROFILE, ...JSON.parse(raw) };
+  } catch (e) {
+    console.error('Error reading profile:', e);
+  }
+  return { ...DEFAULT_PROFILE };
+}
+
+function saveUserProfile(profile) {
+  try {
+    localStorage.setItem('phytoscan_user_profile', JSON.stringify(profile));
+    updateProfileUI(profile);
+    showToast('Farmer profile & preferences updated successfully!', 'success');
+  } catch (e) {
+    console.error('Error saving profile:', e);
+    showToast('Failed to save profile settings.', 'error');
+  }
+}
+
+function updateProfileUI(p) {
+  // Update Navbar
+  const nameEl = document.getElementById('nav-user-name');
+  const roleEl = document.getElementById('nav-user-role');
+  const avatarEl = document.getElementById('nav-user-avatar');
+  if (nameEl) nameEl.textContent = p.name || DEFAULT_PROFILE.name;
+  if (roleEl) roleEl.textContent = p.role || DEFAULT_PROFILE.role;
+  if (avatarEl) avatarEl.textContent = p.avatar || DEFAULT_PROFILE.avatar;
+
+  // Update Profile Form Fields
+  const inpName = document.getElementById('prof-name');
+  const inpRole = document.getElementById('prof-role');
+  const inpFarm = document.getElementById('prof-farm');
+  const inpLoc = document.getElementById('prof-location');
+  const inpPhil = document.getElementById('prof-organic-pref');
+  const inpThresh = document.getElementById('prof-threshold');
+
+  if (inpName) inpName.value = p.name || '';
+  if (inpRole) inpRole.value = p.role || DEFAULT_PROFILE.role;
+  if (inpFarm) inpFarm.value = p.farm || '';
+  if (inpLoc) inpLoc.value = p.location || '';
+  if (inpPhil) inpPhil.value = p.philosophy || 'organic-first';
+  if (inpThresh) inpThresh.value = String(p.threshold || 75);
+
+  // Update Monitored Crop Checkboxes
+  const cropBoxes = document.querySelectorAll('#crop-tags-container input[name="crops"]');
+  cropBoxes.forEach(cb => {
+    cb.checked = Array.isArray(p.crops) && p.crops.includes(cb.value);
+  });
+
+  // Calculate & Update Farm Health Stats
+  const history = getScanHistory();
+  const totalScans = history.length;
+  const healthyCount = history.filter(h => h.health_status === 'healthy').length;
+  const diseasedCount = totalScans - healthyCount;
+  const healthRate = totalScans > 0 ? Math.round((healthyCount / totalScans) * 100) : 100;
+
+  const statScans = document.getElementById('pstat-scans');
+  const statRate = document.getElementById('pstat-health-rate');
+  const statDiseases = document.getElementById('pstat-diseases-caught');
+  const statSaved = document.getElementById('pstat-saved-reports');
+
+  if (statScans) statScans.textContent = totalScans;
+  if (statRate) statRate.textContent = `${healthRate}%`;
+  if (statDiseases) statDiseases.textContent = diseasedCount;
+  if (statSaved) statSaved.textContent = totalScans;
+
+  // Update Navbar Diary Counter Badge
+  const counterEl = document.getElementById('scan-counter-badge');
+  if (counterEl) counterEl.textContent = totalScans;
+}
+
+// ─── FIELD DIARY (SCAN HISTORY) SYSTEM ────────────────────────────────────────
+function getScanHistory() {
+  try {
+    const raw = localStorage.getItem('phytoscan_scan_history');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.error('Error reading scan history:', e);
+  }
+  return [];
+}
+
+function saveScanToHistory(result, imageSrc) {
+  if (!result || !result.canonical) return;
+  const history = getScanHistory();
+
+  const entry = {
+    id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+    timestamp: new Date().toISOString(),
+    displayDate: new Date().toLocaleString(undefined, {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    }),
+    plant: result.plant,
+    disease: result.disease,
+    canonical: result.canonical,
+    confidence: result.confidence,
+    health_status: result.health_status,
+    pathogen: result.pathogen || 'Foliar Pathogen',
+    message: result.message,
+    advisory: result.advisory || getAdvisory(result.canonical),
+    sources: result.sources || [],
+    image: imageSrc || previewImg?.src || ''
+  };
+
+  // Avoid duplicate immediate entries
+  if (history.length > 0 && history[0].canonical === entry.canonical && (Date.now() - new Date(history[0].timestamp).getTime() < 3000)) {
+    return;
+  }
+
+  history.unshift(entry);
+  // Cap at 100 recent entries
+  if (history.length > 100) history.pop();
+
+  try {
+    localStorage.setItem('phytoscan_scan_history', JSON.stringify(history));
+    updateProfileUI(getUserProfile());
+  } catch (e) {
+    console.warn('Storage limit reached, trimming history:', e);
+  }
+}
+
+function renderDiaryList(filter = 'all', searchQuery = '') {
+  const container = document.getElementById('history-list');
+  const emptyEl = document.getElementById('history-empty');
+  if (!container) return;
+
+  const history = getScanHistory();
+  const query = searchQuery.trim().toLowerCase();
+
+  const filtered = history.filter(item => {
+    if (filter === 'healthy' && item.health_status !== 'healthy') return false;
+    if (filter === 'diseased' && item.health_status === 'healthy') return false;
+    if (query) {
+      const target = `${item.plant} ${item.disease} ${item.pathogen} ${item.canonical}`.toLowerCase();
+      if (!target.includes(query)) return false;
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = '';
+    if (emptyEl) emptyEl.classList.remove('hidden');
+    return;
+  }
+
+  if (emptyEl) emptyEl.classList.add('hidden');
+  container.innerHTML = '';
+  const defaultLeafSvg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%2322c55e' stroke-width='2'%3E%3Cpath d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'%3E%3C/path%3E%3C/svg%3E";
+
+  filtered.forEach(item => {
+    const isHealthy = item.health_status === 'healthy';
+    const pct = Math.round(item.confidence * 100);
+    const thumbSrc = item.image ? item.image : defaultLeafSvg;
+    const card = document.createElement('div');
+    card.className = 'history-card';
+    card.innerHTML = `
+      <div class="history-top">
+        <img class="history-thumb" src="${thumbSrc}" alt="${item.plant}" />
+        <div class="history-info">
+          <div class="history-plant">${item.plant}</div>
+          <div class="history-disease">${item.disease}</div>
+          <div class="history-date">${item.displayDate}</div>
+        </div>
+      </div>
+      <div class="history-badge-row">
+        <span class="hbadge ${isHealthy ? 'healthy' : 'diseased'}">
+          ${isHealthy ? '&#x2705; Healthy' : '&#x26A0;&#xFE0F; Diseased'}
+        </span>
+        <span class="hconf">${pct}% Conf.</span>
+      </div>
+      <div class="history-card-actions">
+        <button class="btn-primary btn-xs load-scan-btn" data-id="${item.id}" type="button" style="flex:1;">
+          View Full Diagnosis
+        </button>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  // Attach Load Scan Listeners
+  container.querySelectorAll('.load-scan-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const target = history.find(h => h.id === id);
+      if (target) {
+        currentResult = target;
+        if (target.image && previewImg) {
+          previewImg.src = target.image;
+          showPreview();
+        }
+        displayResult(target);
+        closeModal('history-modal');
+        showToast('Loaded ' + target.plant + ' — ' + target.disease + ' diagnosis', 'info');
+      }
+    });
+  });
+}
+
+// ─── MODAL CONTROLLERS & EVENT LISTENERS ───────────────────────────────────────
+function openModal(id) {
+  const m = document.getElementById(id);
+  if (m) {
+    m.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function closeModal(id) {
+  const m = document.getElementById(id);
+  if (m) {
+    m.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+}
+
+// Profile Modal
+document.getElementById('profile-btn')?.addEventListener('click', () => {
+  updateProfileUI(getUserProfile());
+  openModal('profile-modal');
+});
+document.getElementById('close-profile-btn')?.addEventListener('click', () => closeModal('profile-modal'));
+document.getElementById('save-profile-btn')?.addEventListener('click', () => {
+  const crops = [];
+  document.querySelectorAll('#crop-tags-container input[name="crops"]:checked').forEach(cb => {
+    crops.push(cb.value);
+  });
+
+  const profile = {
+    ...getUserProfile(),
+    name: document.getElementById('prof-name')?.value.trim() || DEFAULT_PROFILE.name,
+    role: document.getElementById('prof-role')?.value || DEFAULT_PROFILE.role,
+    farm: document.getElementById('prof-farm')?.value.trim() || DEFAULT_PROFILE.farm,
+    location: document.getElementById('prof-location')?.value.trim() || DEFAULT_PROFILE.location,
+    philosophy: document.getElementById('prof-organic-pref')?.value || 'organic-first',
+    threshold: parseInt(document.getElementById('prof-threshold')?.value || '75', 10),
+    crops: crops
+  };
+
+  saveUserProfile(profile);
+  closeModal('profile-modal');
+});
+
+document.getElementById('reset-profile-btn')?.addEventListener('click', () => {
+  saveUserProfile(DEFAULT_PROFILE);
+  updateProfileUI(DEFAULT_PROFILE);
+  showToast('Reset profile to factory defaults', 'info');
+});
+
+// Field Diary Modal
+document.getElementById('history-btn')?.addEventListener('click', () => {
+  renderDiaryList('all', '');
+  openModal('history-modal');
+});
+document.getElementById('close-history-btn')?.addEventListener('click', () => closeModal('history-modal'));
+
+// Diary Search & Filters
+document.getElementById('history-search')?.addEventListener('input', (e) => {
+  const activeFilter = document.querySelector('.history-filter-btn.active')?.dataset.filter || 'all';
+  renderDiaryList(activeFilter, e.target.value);
+});
+
+document.querySelectorAll('.history-filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.history-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const search = document.getElementById('history-search')?.value || '';
+    renderDiaryList(btn.dataset.filter, search);
+  });
+});
+
+document.getElementById('export-history-btn')?.addEventListener('click', () => {
+  const history = getScanHistory();
+  if (!history.length) {
+    showToast('No scans recorded in Field Diary to export.', 'warning');
+    return;
+  }
+  const blob = new Blob([JSON.stringify(history, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `phytoscan_field_diary_${Date.now()}.json`;
+  a.click();
+  showToast('Field Diary logs exported (JSON)', 'success');
+});
+
+document.getElementById('clear-history-btn')?.addEventListener('click', () => {
+  if (confirm('Are you sure you want to clear all recorded scans from your Field Diary?')) {
+    localStorage.removeItem('phytoscan_scan_history');
+    renderDiaryList('all', '');
+    updateProfileUI(getUserProfile());
+    showToast('Field Diary cleared.', 'info');
+  }
+});
+
+// Save to Diary Button in Results Action Bar
+document.getElementById('save-diary-btn')?.addEventListener('click', () => {
+  if (!currentResult) {
+    showToast('No active diagnosis to save.', 'warning');
+    return;
+  }
+  saveScanToHistory(currentResult, previewImg?.src || '');
+  showToast(`Saved ${currentResult.plant} diagnosis to Field Diary!`, 'success');
+});
+
+// Future AI Lab Modal
+document.getElementById('future-work-btn')?.addEventListener('click', () => {
+  openModal('future-modal');
+});
+document.getElementById('close-future-btn')?.addEventListener('click', () => closeModal('future-modal'));
+
+// Feature voting / Beta request handler
+document.querySelectorAll('.roadmap-vote-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const feat = btn.dataset.feature;
+    btn.disabled = true;
+    btn.innerHTML = '&#x2705; Beta Access Requested!';
+    btn.style.borderColor = 'var(--green)';
+    btn.style.color = 'var(--green-light)';
+    showToast(`Registered early beta interest for "${feat}"!`, 'success');
+  });
+});
+
+// Close modals on backdrop click or ESC key
+document.querySelectorAll('.modal-backdrop').forEach(modal => {
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal(modal.id);
+  });
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-backdrop').forEach(m => closeModal(m.id));
+  }
+});
+
+// Initialize Profile and Diary on page load
+document.addEventListener('DOMContentLoaded', () => {
+  updateProfileUI(getUserProfile());
+});
+// Also run immediately if DOM is already ready
+updateProfileUI(getUserProfile());
+
