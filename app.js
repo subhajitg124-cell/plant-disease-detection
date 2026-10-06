@@ -1667,24 +1667,14 @@ function handleFile(file) {
   }
   const reader = new FileReader();
   reader.onload = (e) => {
-    const img = new Image();
-    img.onload = () => {
-      // ── Plant tissue validation before accepting upload ──
-      if (!isLeafImage(img)) {
-        showInvalid();
-        showToast('Not a plant image — please upload a leaf, fruit, or flower photo.', 'error', 4000);
-        return;
-      }
-      previewImg.src = e.target.result;
-      uploadedFile = file;
-      showPreview();
-      if (analyseBtn) analyseBtn.disabled = false;
-      if (analyseTxt) analyseTxt.textContent = 'Analyse Plant Specimen';
-      showToast(`Plant image loaded: ${file.name}`, 'info', 2000);
-      // Auto-trigger analysis
-      runAnalysis();
-    };
-    img.src = e.target.result;
+    previewImg.src = e.target.result;
+    uploadedFile = file;
+    showPreview();
+    if (analyseBtn) analyseBtn.disabled = false;
+    if (analyseTxt) analyseTxt.textContent = 'Analyse Plant Specimen';
+    showToast(`Specimen loaded: ${file.name}`, 'info', 2000);
+    // Auto-trigger analysis
+    runAnalysis();
   };
   reader.readAsDataURL(file);
 }

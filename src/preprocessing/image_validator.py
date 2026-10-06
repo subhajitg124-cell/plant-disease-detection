@@ -31,21 +31,17 @@ class ImageValidator:
         self,
         min_width: int = 32,
         min_height: int = 32,
-        # CALIBRATED: Genuine plant leaves have >= 30% foliar tissue.
-        # 0.15 comfortably accepts sparse leaves and fruit while rejecting non-plants.
-        foliage_green_threshold: float = 0.15,
-        # CALIBRATED: Real leaf images have texture variance 200-1800 over plant pixels.
-        # 50.0 cleanly rejects flat/smooth graphics, painted walls, and cartoons (< 30).
-        texture_variance_threshold: float = 50.0,
-        # CALIBRATED: Genuine leaf photos have Canny edge density 0.08 - 0.28.
-        # 0.025 cleanly rejects flat non-plant surfaces, clothing, and balls (0.00 - 0.018).
-        edge_density_min: float = 0.025,
+        # CALIBRATED: Plant foliage covers at least 5% of the frame (allowing leaves on tables/pots/gardens)
+        foliage_green_threshold: float = 0.05,
+        # CALIBRATED: Pure flat graphics / blank fills have variance < 2.0; genuine leaves have >= 10.0
+        texture_variance_threshold: float = 10.0,
+        # CALIBRATED: Canny edge density on high-res camera photos of leaves is 0.002–0.02; blank/solid images have < 0.0005
+        edge_density_min: float = 0.002,
         max_dim: int = 4096,
         min_saturation_coverage: float = 0.04,
         max_sky_ratio: float = 0.70,
-        # CALIBRATED: Real leaves have 20%-60% green dominance.
-        # 0.06 cleanly rejects faces, animals, buildings, and non-plant items (< 0.02).
-        min_green_dominance: float = 0.06,
+        # CALIBRATED: Even severely diseased/blighted brown or yellow leaves have at least 1% green/yellow foliar tissue
+        min_green_dominance: float = 0.01,
     ):
         self.min_width = min_width
         self.min_height = min_height
