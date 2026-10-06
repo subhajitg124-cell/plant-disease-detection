@@ -131,7 +131,7 @@ class PlantDiseaseClassifier:
                 self.model.load_state_dict(state_dict)
                 self.model_class_ids = class_ids
                 self.not_a_plant_class_id = int(reject_id) if reject_id is not None else None
-                self.num_classes = output_count
+                self.num_classes = max(len(self.class_map), output_count, 38)
                 self.checkpoint_metadata = checkpoint if isinstance(checkpoint, dict) else {}
                 self.checkpoint_loaded = True
                 self.trained_on_images = bool(
@@ -258,8 +258,8 @@ class PlantDiseaseClassifier:
             top2_prob = float(sorted_probs[1].item()) if len(sorted_probs) > 1 else 0.0
             top5_sum  = float(sorted_probs[:5].sum().item())
 
-            # OOD if maximally uncertain (scattered distribution)
-            if h_norm > 0.80:
+            # OOD if maximally uncertain (probabilities scattered across classes)
+            if h_norm > 0.60:
                 return VisionPrediction(
                     plant="Non-Plant / Unrecognised",
                     disease="Image Not Recognised",
@@ -267,21 +267,6 @@ class PlantDiseaseClassifier:
                     confidence=confidence,
                     status=PredictionStatus.NOT_A_PLANT.value,
                     raw_label="ood_high_entropy",
-                    embedding=None,
-                    model_version=str(
-                        self.checkpoint_metadata.get("model_version", "vision_image_trained_v2")
-                    )
-                )
-
-            # OOD if degenerate collapse (all mass on one class, nothing on others)
-            if top1_prob > 0.97 and top2_prob < 0.01:
-                return VisionPrediction(
-                    plant="Non-Plant / Unrecognised",
-                    disease="Image Not Recognised",
-                    canonical_id="not_a_plant",
-                    confidence=confidence,
-                    status=PredictionStatus.NOT_A_PLANT.value,
-                    raw_label="ood_degenerate",
                     embedding=None,
                     model_version=str(
                         self.checkpoint_metadata.get("model_version", "vision_image_trained_v2")

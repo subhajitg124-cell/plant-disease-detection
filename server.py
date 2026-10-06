@@ -152,15 +152,20 @@ class PatraDristiRequestHandler(SimpleHTTPRequestHandler):
                             "risk_factors": res.advisory.risk_factors if hasattr(res.advisory, "risk_factors") else []
                         }
 
+                    is_rejected = (
+                        res.status in ("not_a_plant", "REJECTED_LOW_CONFIDENCE")
+                        or res.prediction.canonical_id == "not_a_plant"
+                    )
+
                     response_payload = {
-                        "plant": res.prediction.plant,
-                        "disease": res.prediction.disease,
-                        "canonical_id": res.prediction.canonical_id,
+                        "plant": "Non-Plant / Unrecognised" if is_rejected else res.prediction.plant,
+                        "disease": "Image Not Recognised" if is_rejected else res.prediction.disease,
+                        "canonical_id": "not_a_plant" if is_rejected else res.prediction.canonical_id,
                         "confidence": float(res.confidence),
-                        "status": res.status,
+                        "status": "not_a_plant" if is_rejected else res.status,
                         "user_message": res.user_message,
-                        "advisory": advisory_dict,
-                        "sources": res.sources
+                        "advisory": None if is_rejected else advisory_dict,
+                        "sources": [] if is_rejected else res.sources
                     }
                 else:
                     self.send_response(503)

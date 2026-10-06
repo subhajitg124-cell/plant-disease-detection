@@ -57,21 +57,31 @@ class PlantDiseasePipeline:
             prediction.status in (PredictionStatus.SUPPORTED.value, PredictionStatus.UNCERTAIN.value)
             and prediction.confidence < self.confidence_threshold
         ):
+            rejected_pred = VisionPrediction(
+                plant="Non-Plant / Unrecognised",
+                disease="Image Not Recognised",
+                canonical_id="not_a_plant",
+                confidence=prediction.confidence,
+                status=PredictionStatus.NOT_A_PLANT.value,
+                raw_label="rejected_low_confidence",
+                embedding=None,
+                model_version=prediction.model_version
+            )
             return IntegratedResponse(
-                prediction=prediction,
+                prediction=rejected_pred,
                 advisory=None,
                 user_message=(
-                    "The image could not be confidently identified as a plant disease "
+                    "The image could not be confidently identified as a plant leaf disease "
                     f"(confidence: {prediction.confidence * 100:.1f}%). "
                     "Please upload a clear, well-lit photo of a plant leaf, fruit, or flower."
                 ),
                 confidence=prediction.confidence,
-                status=REJECTED_LOW_CONFIDENCE,
+                status=PredictionStatus.NOT_A_PLANT.value,
                 evidence=[],
                 sources=[],
                 warnings=[
                     f"Confidence {prediction.confidence:.3f} is below the "
-                    f"{self.confidence_threshold:.2f} gate; advisory suppressed."
+                    f"{self.confidence_threshold:.2f} gate; rejected as non-plant / unrecognised."
                 ]
             )
         response = self.generator.generate_advisory(prediction)

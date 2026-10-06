@@ -90,33 +90,44 @@ function isLeafImage(imgElement) {
     const ctx = canvas.getContext('2d');
     ctx.drawImage(imgElement, 0, 0, 120, 120);
     const imgData = ctx.getImageData(0, 0, 120, 120).data;
-    let foliarPixels = 0;
+    let plantPixels = 0;
+    let greenFoliagePixels = 0;
     const total = 120 * 120;
 
     for (let i = 0; i < imgData.length; i += 4) {
       const r = imgData[i], g = imgData[i + 1], b = imgData[i + 2];
       const max = Math.max(r, g, b), min = Math.min(r, g, b), diff = max - min;
 
-      if (max < 8) continue; // Skip deep black masks
+      if (max < 10) continue; // Skip deep black masks
+      // Skip pure white / gray background
+      if (r > 215 && g > 215 && b > 215 && diff < 20) continue;
+      // Skip sky-blue / blue lab background
+      if (b > r + 35 && b > g + 25 && b > 80) continue;
 
-      // Green foliar tissue
-      const isGreen = (g > r * 0.90 && g > b * 1.05 && g > 25) || (g > 40 && g > r && g > b);
+      // Green foliar tissue (leaf/stem)
+      const isGreen = (g > r * 0.92 && g > b * 1.05 && g > 28) || (g > 40 && g > r && g > b);
       // Chlorotic yellow / pale green
-      const isYellow = (r > 70 && g > 65 && b < 150 && r + g > b * 1.5 && diff > 10);
-      // Brown / necrotic lesion tissue
-      const isBrown = (r > 35 && r < 230 && g > 15 && g < 180 && b < 150 && r >= g - 8 && r > b + 6 && diff > 10);
+      const isYellow = (r > 70 && g > 65 && b < 140 && r + g > b * 1.6 && Math.abs(r - g) < 50 && diff > 12);
+      // Real foliar necrotic lesion (accompanied by leaf color or dark spots on green)
+      const isBrown = (r > 40 && r < 210 && g > 20 && g < 160 && b < 120 && r > g && r > b + 10 && diff > 15);
       // Olive / dark foliage
-      const isOlive = (r >= 30 && r <= 160 && g >= 40 && g <= 170 && b <= 100);
-      // Orange rust pustules
-      const isOrange = (r > 90 && g > 30 && g < 140 && b < 80 && r > g * 1.15 && diff > 15);
+      const isOlive = (r >= 30 && r <= 150 && g >= 40 && g <= 160 && b <= 100 && g >= r * 0.9);
+      // Red fruit (tomato, apple)
+      const isRed = (r > 120 && r > g * 1.5 && r > b * 1.5 && diff > 30);
 
-      if (isGreen || isYellow || isBrown || isOlive || isOrange) {
-        foliarPixels++;
+      if (isGreen || isYellow) {
+        greenFoliagePixels++;
+        plantPixels++;
+      } else if (isBrown || isOlive || isRed) {
+        plantPixels++;
       }
     }
 
-    // At least 4% foliar pixels detected
-    return (foliarPixels / total) >= 0.04;
+    const foliageRatio = plantPixels / total;
+    const greenRatio = greenFoliagePixels / total;
+
+    // Genuine plant leaves have at least 15% plant pixels and at least 4% green/yellow foliar pixels
+    return foliageRatio >= 0.15 && greenRatio >= 0.04;
   } catch (e) {
     return true;
   }

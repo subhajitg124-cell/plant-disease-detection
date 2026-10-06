@@ -1581,42 +1581,43 @@ function isLeafImage(imgElement) {
     ctx.drawImage(imgElement, 0, 0, 120, 120);
     const imgData = ctx.getImageData(0, 0, 120, 120).data;
     let plantPixels = 0;
+    let greenFoliagePixels = 0;
     const total = 120 * 120;
 
     for (let i = 0; i < imgData.length; i += 4) {
       const r = imgData[i], g = imgData[i + 1], b = imgData[i + 2];
       const max = Math.max(r, g, b), min = Math.min(r, g, b), diff = max - min;
 
-      if (max < 8) continue; // Skip deep black masks
-      // Skip pure white background
-      if (r > 230 && g > 230 && b > 230 && diff < 20) continue;
-      // Skip pure blue background (sky/lab backdrop)
-      if (b > r + 40 && b > g + 30 && b > 90) continue;
+      if (max < 10) continue; // Skip deep black masks
+      // Skip pure white / gray background
+      if (r > 215 && g > 215 && b > 215 && diff < 20) continue;
+      // Skip sky-blue / blue lab background
+      if (b > r + 35 && b > g + 25 && b > 80) continue;
 
       // Green foliar tissue (leaf/stem)
-      const isGreen = (g > r * 0.88 && g > b * 1.05 && g > 25) || (g > 40 && g > r && g > b);
-      // Chlorotic yellow / pale green / fruit-yellow
-      const isYellow = (r > 70 && g > 65 && b < 150 && r + g > b * 1.5 && diff > 10);
-      // Brown / necrotic lesion / bark tissue
-      const isBrown = (r > 35 && r < 230 && g > 15 && g < 180 && b < 150 && r >= g - 8 && r > b + 6 && diff > 10);
+      const isGreen = (g > r * 0.92 && g > b * 1.05 && g > 28) || (g > 40 && g > r && g > b);
+      // Chlorotic yellow / pale green
+      const isYellow = (r > 70 && g > 65 && b < 140 && r + g > b * 1.6 && Math.abs(r - g) < 50 && diff > 12);
+      // Real foliar necrotic lesion (accompanied by leaf color or dark spots on green)
+      const isBrown = (r > 40 && r < 210 && g > 20 && g < 160 && b < 120 && r > g && r > b + 10 && diff > 15);
       // Olive / dark foliage
-      const isOlive = (r >= 30 && r <= 160 && g >= 40 && g <= 170 && b <= 110);
-      // Orange rust pustules / fruit skin
-      const isOrange = (r > 90 && g > 30 && g < 150 && b < 90 && r > g * 1.15 && diff > 15);
-      // Red fruit / berries (tomato, apple)
-      const isRed = (r > 100 && r > g * 1.6 && r > b * 1.6 && diff > 30);
-      // Pink / white flower petals
-      const isPink = (r > 150 && b > 100 && g < r && r - g > 15 && diff < 80);
-      // Purple / blue-violet flower
-      const isPurple = (b > 80 && r > 60 && g < r && g < b && diff > 15);
+      const isOlive = (r >= 30 && r <= 150 && g >= 40 && g <= 160 && b <= 100 && g >= r * 0.9);
+      // Red fruit (tomato, apple)
+      const isRed = (r > 120 && r > g * 1.5 && r > b * 1.5 && diff > 30);
 
-      if (isGreen || isYellow || isBrown || isOlive || isOrange || isRed || isPink || isPurple) {
+      if (isGreen || isYellow) {
+        greenFoliagePixels++;
+        plantPixels++;
+      } else if (isBrown || isOlive || isRed) {
         plantPixels++;
       }
     }
 
-    // At least 4% plant-tissue pixels required
-    return (plantPixels / total) >= 0.04;
+    const foliageRatio = plantPixels / total;
+    const greenRatio = greenFoliagePixels / total;
+
+    // Genuine plant leaves have at least 15% plant pixels and at least 4% green/yellow foliar pixels
+    return foliageRatio >= 0.15 && greenRatio >= 0.04;
   } catch (e) {
     return true; // Fail open — let server validate
   }
@@ -1914,7 +1915,7 @@ function analyzeLeafClientSide(imgEl, filename = '') {
       }
 
       // Healthy classification
-      if (greenRatio > 0.35 && diseaseScore < 0.03) {
+      if (greenRatio > 0.20 && diseaseScore < 0.04) {
         const healthyMap = {
           apple: 'apple_healthy',
           corn: 'corn_healthy',
@@ -1930,9 +1931,10 @@ function analyzeLeafClientSide(imgEl, filename = '') {
         return resolve({ canonical: target, confidence: 0.965 });
       }
 
-      return resolve({ canonical: 'tomato_early_blight', confidence: 0.892 });
+      // If specimen does not exhibit clear foliar disease signs or healthy leaf tissue, reject
+      return resolve({ canonical: 'not_a_plant', confidence: 0.0, status: 'not_a_plant' });
     } catch (e) {
-      resolve({ canonical: 'tomato_early_blight', confidence: 0.880 });
+      resolve({ canonical: 'not_a_plant', confidence: 0.0, status: 'not_a_plant' });
     }
   });
 }
@@ -1986,7 +1988,13 @@ async function runAnalysis() {
 
     if (resp.ok) {
       const data = await resp.json();
-      if (data && data.canonical_id && data.canonical_id !== 'not_a_plant') {
+      if (data && (data.status === 'not_a_plant' || data.canonical_id === 'not_a_plant' || data.status === 'REJECTED_LOW_CONFIDENCE')) {
+        // Server confirmed it's not a plant or confidence below threshold — show rejection UI
+        hideAll();
+        showInvalid();
+        showToast(data.user_message || 'Image could not be identified as a plant leaf disease. Please upload a clear photo of a plant leaf.', 'error', 4500);
+        return;
+      } else if (data && data.canonical_id && data.canonical_id !== 'not_a_plant') {
         const fullAdv = getAdvisory(data.canonical_id);
         const rawAdv = data.advisory || {};
         const mergedAdv = {
@@ -2005,19 +2013,13 @@ async function runAnalysis() {
           canonical: data.canonical_id,
           confidence: Number(data.confidence) || 0.92,
           status: data.status || 'supported',
-          health_status: fullAdv?.health_status || 'diseased',
-          pathogen: fullAdv?.pathogen || 'Foliar Pathogen',
+          health_status: fullAdv?.health_status || (data.canonical_id.includes('healthy') ? 'healthy' : 'diseased'),
+          pathogen: fullAdv?.pathogen || (data.canonical_id.includes('healthy') ? 'None (Healthy)' : 'Foliar Pathogen'),
           advisory: mergedAdv,
           message: data.user_message || '',
           source: 'PyTorch CNN + Vector RAG Model'
         };
         apiSuccess = true;
-      } else if (data && (data.status === 'not_a_plant' || data.canonical_id === 'not_a_plant')) {
-        // Server confirmed it's not a plant — show rejection UI
-        hideAll();
-        showInvalid();
-        showToast('Not a plant image — please upload a leaf, fruit, or flower.', 'error', 4500);
-        return;
       }
     }
   } catch (err) {
@@ -2027,8 +2029,20 @@ async function runAnalysis() {
   // ── Client-side fallback when backend unavailable ───────────────────────────
   if (!apiSuccess || !result) {
     const clientPrediction = await analyzeLeafClientSide(previewImg, uploadedFile.name || sampleId || '');
+    if (!clientPrediction || clientPrediction.canonical === 'not_a_plant' || clientPrediction.status === 'not_a_plant') {
+      hideAll();
+      showInvalid();
+      showToast('Specimen could not be recognized as a supported plant condition. Please upload a clear leaf photo.', 'error', 4500);
+      return;
+    }
     const canonical = clientPrediction.canonical;
     const adv = getAdvisory(canonical);
+    if (!adv) {
+      hideAll();
+      showInvalid();
+      showToast('Specimen could not be recognized as a supported plant condition.', 'error', 4500);
+      return;
+    }
     const conf = clientPrediction.confidence;
     result = {
       plant: adv.plant,

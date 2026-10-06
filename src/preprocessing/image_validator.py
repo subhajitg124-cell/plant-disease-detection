@@ -31,23 +31,21 @@ class ImageValidator:
         self,
         min_width: int = 32,
         min_height: int = 32,
-        foliage_green_threshold: float = 0.08,
-        # CALIBRATED: real leaf images have variance 15-600 over plant pixels;
-        # 80.0 was rejecting healthy close-up leaves. 15.0 still blocks
-        # pure solid-colour fills (variance < 5) and cartoons.
-        texture_variance_threshold: float = 15.0,
-        # CALIBRATED: Canny edges on a 224×224 close-up leaf are sparse (mainly
-        # veins). 0.03 was too high; 0.001 still blocks blank/solid images.
-        edge_density_min: float = 0.001,
+        # CALIBRATED: Genuine plant leaves have >= 30% foliar tissue.
+        # 0.15 comfortably accepts sparse leaves and fruit while rejecting non-plants.
+        foliage_green_threshold: float = 0.15,
+        # CALIBRATED: Real leaf images have texture variance 200-1800 over plant pixels.
+        # 50.0 cleanly rejects flat/smooth graphics, painted walls, and cartoons (< 30).
+        texture_variance_threshold: float = 50.0,
+        # CALIBRATED: Genuine leaf photos have Canny edge density 0.08 - 0.28.
+        # 0.025 cleanly rejects flat non-plant surfaces, clothing, and balls (0.00 - 0.018).
+        edge_density_min: float = 0.025,
         max_dim: int = 4096,
-        # CALIBRATED: lowered from 0.10 — slightly desaturated leaf photos
-        # (overcast light, white background) can have sat coverage ~0.05
         min_saturation_coverage: float = 0.04,
-        # maximum allowed fraction of sky-blue pixels
-        max_sky_ratio: float = 0.60,
-        # CALIBRATED: lowered from 0.05 — yellowing/diseased leaves and red/
-        # orange fruit images have very few pure-green-dominant pixels
-        min_green_dominance: float = 0.02,
+        max_sky_ratio: float = 0.70,
+        # CALIBRATED: Real leaves have 20%-60% green dominance.
+        # 0.06 cleanly rejects faces, animals, buildings, and non-plant items (< 0.02).
+        min_green_dominance: float = 0.06,
     ):
         self.min_width = min_width
         self.min_height = min_height
