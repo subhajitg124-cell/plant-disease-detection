@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from src.adaptation.adaptation_pipeline import FewShotAdaptationEngine, AdaptedClassProfile
 from src.adaptation.baseline_freeze import BaselineFreezer
 from src.contracts import PredictionStatus, IntegratedResponse
+from tests.leaf_fixtures import make_textured_leaf
 
 
 class TestAdaptationPipeline(unittest.TestCase):
@@ -18,9 +19,9 @@ class TestAdaptationPipeline(unittest.TestCase):
     def test_prototype_registration_and_classification(self):
         # Create 3 synthetic support samples for an unseen class "tea_blister_blight"
         support_imgs = [
-            np.full((224, 224, 3), [30, 160, 40], dtype=np.uint8),
-            np.full((224, 224, 3), [35, 155, 45], dtype=np.uint8),
-            np.full((224, 224, 3), [32, 158, 42], dtype=np.uint8)
+            make_textured_leaf(224, 224, base=(30, 160, 40), seed=1),
+            make_textured_leaf(224, 224, base=(35, 155, 45), seed=2),
+            make_textured_leaf(224, 224, base=(32, 158, 42), seed=3)
         ]
         
         kb_meta = {
@@ -45,7 +46,7 @@ class TestAdaptationPipeline(unittest.TestCase):
         self.assertIn("tea_blister_blight", self.engine.prototypes)
 
         # Classify query image close to tea blister blight
-        query_img = np.full((224, 224, 3), [33, 157, 43], dtype=np.uint8)
+        query_img = make_textured_leaf(224, 224, base=(33, 157, 43), seed=4)
         pred = self.engine.classify(query_img)
 
         self.assertEqual(pred.canonical_id, "tea_blister_blight")
@@ -56,7 +57,7 @@ class TestAdaptationPipeline(unittest.TestCase):
 
     def test_adapted_predict_and_advise(self):
         # Register unseen class
-        support_imgs = [np.full((224, 224, 3), [40, 150, 30], dtype=np.uint8)]
+        support_imgs = [make_textured_leaf(224, 224, base=(40, 150, 30), seed=10)]
         self.engine.register_class_prototype(
             canonical_id="coffee_rust",
             plant="Coffee",
@@ -71,7 +72,7 @@ class TestAdaptationPipeline(unittest.TestCase):
             }
         )
 
-        query_img = np.full((224, 224, 3), [40, 150, 30], dtype=np.uint8)
+        query_img = make_textured_leaf(224, 224, base=(40, 150, 30), seed=11)
         response = self.engine.predict_and_advise(query_img)
 
         self.assertIsInstance(response, IntegratedResponse)

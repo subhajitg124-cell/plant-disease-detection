@@ -50,6 +50,7 @@ class PlantDiseaseClassifier:
         self.checkpoint_loaded = False
         self.trained_on_images = False
         self.checkpoint_metadata: Dict[str, Any] = {}
+        self.not_a_plant_class_id: Optional[int] = None
 
         if HAS_TORCH:
             if device is None:
@@ -118,8 +119,10 @@ class PlantDiseaseClassifier:
                         raise ValueError(
                             "Checkpoint class_ids do not match its classifier output size."
                         )
+                reject_id = checkpoint.get("not_a_plant_class_id") if isinstance(checkpoint, dict) else None
                 unknown_ids = [
-                    class_id for class_id in class_ids if class_id not in self.class_map
+                    class_id for class_id in class_ids
+                    if class_id not in self.class_map and class_id != reject_id
                 ]
                 if unknown_ids:
                     raise ValueError(f"Checkpoint references unmapped class IDs: {unknown_ids}")
@@ -127,6 +130,7 @@ class PlantDiseaseClassifier:
                 self.model = PlantDiseaseCNN(num_classes=output_count).to(self.device)
                 self.model.load_state_dict(state_dict)
                 self.model_class_ids = class_ids
+                self.not_a_plant_class_id = int(reject_id) if reject_id is not None else None
                 self.num_classes = output_count
                 self.checkpoint_metadata = checkpoint if isinstance(checkpoint, dict) else {}
                 self.checkpoint_loaded = True
@@ -231,6 +235,19 @@ class PlantDiseaseClassifier:
             return self._unknown_prediction("The checkpoint class mapping is invalid.")
 
         class_id = self.model_class_ids[top_index]
+        if self.not_a_plant_class_id is not None and class_id == self.not_a_plant_class_id:
+            return VisionPrediction(
+                plant="Non-Plant / Corrupted",
+                disease="Invalid Image",
+                canonical_id="not_a_plant",
+                confidence=confidence,
+                status=PredictionStatus.NOT_A_PLANT.value,
+                raw_label="Not_a_plant",
+                embedding=None,
+                model_version=str(
+                    self.checkpoint_metadata.get("model_version", "vision_image_trained_v2")
+                )
+            )
         class_info = self.class_map.get(class_id)
         if class_info is None or class_id not in self.active_class_ids:
             return self._unknown_prediction("The predicted class is not in this checkpoint.")

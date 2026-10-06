@@ -65,7 +65,13 @@ except ImportError:
     transforms = None
     HAS_TORCHVISION = False
 
-from src.dataset_index import discover_class_images, load_class_mapping, split_images
+from src.dataset_index import (
+    NOT_A_PLANT_LABEL,
+    discover_class_images,
+    load_class_mapping,
+    not_a_plant_class_id,
+    split_images,
+)
 
 class LeafImageDataset(Dataset):
     def __init__(self, records: Sequence[Tuple[Path, int]], augment: bool = False):
@@ -210,9 +216,12 @@ def train_model(
         image_root = ROOT_DIR / image_root
 
     mapping = load_class_mapping(mapping_file)
+    reject_id = not_a_plant_class_id(mapping)
     class_ids, images_by_id, missing_classes = discover_class_images(
-        image_root, mapping, max_images_per_class=max_images_per_class
+        image_root, mapping, max_images_per_class=max_images_per_class,
+        include_not_a_plant=True,
     )
+    has_reject_class = reject_id in class_ids
     train_records, val_records, test_records = split_images(
         class_ids, images_by_id, val_ratio, test_ratio, seed
     )
@@ -251,6 +260,14 @@ def train_model(
         device=device_obj,
     )
     weights = torch.clamp(weights, max=5.0)
+    if has_reject_class and len(class_ids) > 1:
+        # Inverse-frequency weight (~ (disease_images / n_disease_classes) / reject_images)
+        # for the small Not_a_plant class, capped at 10x the mean disease-class weight.
+        reject_index = class_ids.index(reject_id)
+        disease_mask = torch.ones(len(class_ids), dtype=torch.bool, device=device_obj)
+        disease_mask[reject_index] = False
+        disease_mean = weights[disease_mask].mean()
+        weights[reject_index] = torch.minimum(weights[reject_index], 10.0 * disease_mean)
     weights = weights / weights.mean()
 
     model = PlantDiseaseCNN(num_classes=len(class_ids), embedding_dim=128).to(device_obj)
@@ -361,7 +378,11 @@ def train_model(
         "trained_on_images": True,
         "num_classes": len(class_ids),
         "class_ids": class_ids,
-        "class_labels": [mapping[class_id]["original_label"] for class_id in class_ids],
+        "class_labels": [
+            mapping[class_id]["original_label"] if class_id in mapping else NOT_A_PLANT_LABEL
+            for class_id in class_ids
+        ],
+        "not_a_plant_class_id": reject_id if has_reject_class else None,
         "embedding_dim": 128,
         "state_dict": best_state,
         "final_acc": best_macro_accuracy,

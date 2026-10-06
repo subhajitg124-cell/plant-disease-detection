@@ -16,17 +16,16 @@ except ImportError:
     Image = None
 
 from src.embeddings.visual_embeddings import VisualEmbeddingExtractor
+from tests.leaf_fixtures import make_textured_leaf
 
 class TestVisualEmbeddings(unittest.TestCase):
 
     def setUp(self):
         self.extractor = VisualEmbeddingExtractor(embedding_dim=128)
 
-        # Create green synthetic leaf array
+        # Create textured green synthetic leaf array
         if np is not None:
-            self.leaf_arr = np.zeros((224, 224, 3), dtype=np.uint8)
-            self.leaf_arr[:, :, 1] = 200
-            self.leaf_arr[:, :, 0] = 30
+            self.leaf_arr = make_textured_leaf(224, 224, base=(30, 200, 30))
         else:
             self.leaf_arr = [[0, 200, 0]] * (224 * 224)
 

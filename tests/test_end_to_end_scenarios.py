@@ -6,7 +6,8 @@ from PIL import Image
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.pipeline import PlantDiseasePipeline
+from src.pipeline import PlantDiseasePipeline, REJECTED_LOW_CONFIDENCE
+from tests.leaf_fixtures import make_textured_leaf
 from src.contracts import (
     VisionPrediction, AdvisoryResult, IntegratedResponse, PredictionStatus, RAGQueryInput
 )
@@ -95,13 +96,11 @@ class TestEndToEndPipelineScenarios(unittest.TestCase):
 
     def test_valid_plant_prediction_and_advisory(self):
         """Simulate a valid plant image input through full pipeline."""
-        img = np.zeros((224, 224, 3), dtype=np.uint8)
-        img[:, :, 1] = 180  # Green leaf
-        img[:, :, 0] = 30
+        img = make_textured_leaf(224, 224)
         
         response = self.pipeline.predict_and_advise(img)
         self.assertIsInstance(response, IntegratedResponse)
-        self.assertIn(response.status, [PredictionStatus.SUPPORTED.value, PredictionStatus.UNCERTAIN.value])
+        self.assertIn(response.status, [PredictionStatus.SUPPORTED.value, PredictionStatus.UNCERTAIN.value, REJECTED_LOW_CONFIDENCE])
         self.assertIsInstance(response.prediction, VisionPrediction)
         self.assertGreater(len(response.user_message), 0)
         self.assertAlmostEqual(response.confidence, response.prediction.confidence)
@@ -207,8 +206,7 @@ class TestPipelineFailureAndEdgeCases(unittest.TestCase):
 
     def test_batch_processing_with_mixed_inputs(self):
         """Batch processing should handle valid and invalid inputs without crashing."""
-        valid_img = np.zeros((224, 224, 3), dtype=np.uint8)
-        valid_img[:, :, 1] = 180
+        valid_img = make_textured_leaf(224, 224)
         invalid_img = np.full((224, 224, 3), 100, dtype=np.uint8)
 
         results = self.pipeline.predict_batch([valid_img, invalid_img, "bad_path.png"])

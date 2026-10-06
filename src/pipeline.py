@@ -13,6 +13,9 @@ from src.vision.classifier import PlantDiseaseClassifier
 from src.retrieval.rag_retriever import RAGRetriever
 from src.advisory.advisory_generator import AdvisoryGenerator
 
+REJECTED_LOW_CONFIDENCE = "REJECTED_LOW_CONFIDENCE"
+MIN_CONFIDENCE_FLOOR = 0.60
+
 
 class PlantDiseasePipeline:
     def __init__(
@@ -24,10 +27,12 @@ class PlantDiseasePipeline:
         confidence_threshold: float = 0.60,
         device: Optional[str] = None
     ):
+        # Never allow the gate to drop below the 0.60 floor.
+        self.confidence_threshold = max(float(confidence_threshold), MIN_CONFIDENCE_FLOOR)
         self.classifier = PlantDiseaseClassifier(
             model_path=model_path,
             class_mapping_path=class_mapping_path,
-            confidence_threshold=confidence_threshold,
+            confidence_threshold=self.confidence_threshold,
             device=device
         )
         self.retriever = RAGRetriever(kb_path=kb_path, store_dir=store_dir)
@@ -44,6 +49,29 @@ class PlantDiseasePipeline:
         prediction = self.classifier.predict(
             image_input, extract_embedding=extract_embedding, plant_hint=hint
         )
+        # NOT_A_PLANT (validator or Not_a_plant class) is handled by the generator
+        # without touching RAG. Low-confidence predictions are rejected here, before RAG.
+        if (
+            prediction.status in (PredictionStatus.SUPPORTED.value, PredictionStatus.UNCERTAIN.value)
+            and prediction.confidence < self.confidence_threshold
+        ):
+            return IntegratedResponse(
+                prediction=prediction,
+                advisory=None,
+                user_message=(
+                    "The image could not be confidently identified as a plant disease "
+                    f"(confidence: {prediction.confidence * 100:.1f}%). "
+                    "Please upload a clear, well-lit photo of a plant leaf, fruit, or flower."
+                ),
+                confidence=prediction.confidence,
+                status=REJECTED_LOW_CONFIDENCE,
+                evidence=[],
+                sources=[],
+                warnings=[
+                    f"Confidence {prediction.confidence:.3f} is below the "
+                    f"{self.confidence_threshold:.2f} gate; advisory suppressed."
+                ]
+            )
         response = self.generator.generate_advisory(prediction)
         return response
 

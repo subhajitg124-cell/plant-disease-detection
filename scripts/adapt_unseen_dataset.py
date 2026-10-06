@@ -19,6 +19,18 @@ from src.adaptation.adaptation_pipeline import FewShotAdaptationEngine
 from src.contracts import PredictionStatus
 
 
+def _texturize(arr: np.ndarray, seed: int = 0) -> np.ndarray:
+    """Add leaf-like texture and vein lines so synthetic images pass ImageValidator."""
+    rng = np.random.default_rng(seed)
+    noise = rng.integers(-35, 35, size=arr.shape[:2] + (1,))
+    out = np.clip(arr.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+    vein_mask = np.zeros(arr.shape[:2], dtype=bool)
+    vein_mask[::8, :] = True
+    vein_mask[:, ::8] = True
+    out[vein_mask] = (out[vein_mask] * 0.45).astype(np.uint8)
+    return out
+
+
 def run_unseen_adaptation_flow(
     data_dir: Optional[str] = None,
     output_report_path: str = "reports/unseen_adaptation_results.json"
@@ -78,11 +90,11 @@ def run_unseen_adaptation_flow(
     }
 
     class_patterns = [
-        # (r1, r2, c1, c2, ch0, ch1)
-        (20, 90, 20, 90, 180, 60),      # cassava_brown_streak: top-left necrotic patch
-        (70, 150, 70, 150, 60, 190),    # rice_blast: center diamond patch
-        (20, 90, 130, 200, 210, 110),   # wheat_leaf_rust: top-right orange pustules
-        (130, 200, 70, 150, 140, 50)    # cotton_bacterial_blight: bottom-center angular spots
+        # (r1, r2, c1, c2, (r, g, b))
+        (20, 90, 20, 90, (180, 60, 20)),      # cassava_brown_streak: top-left necrotic patch
+        (70, 150, 70, 150, (190, 190, 180)),  # rice_blast: center diamond patch
+        (20, 90, 130, 200, (210, 110, 10)),   # wheat_leaf_rust: top-right orange pustules
+        (130, 200, 70, 150, (40, 30, 15))     # cotton_bacterial_blight: bottom-center angular spots
     ]
 
     # Step 1: Inspect & Ingest Support Sets
@@ -91,8 +103,7 @@ def run_unseen_adaptation_flow(
     query_data: Dict[str, List[np.ndarray]] = {}
 
     for idx, (cid, meta) in enumerate(unseen_taxonomy.items()):
-        pat = class_patterns[idx % len(class_patterns)]
-        r1, r2, c1, c2, ch0, ch1 = pat
+        r1, r2, c1, c2, color = class_patterns[idx % len(class_patterns)]
 
         # Generate 5-shot support representations per class
         support_images = []
@@ -100,9 +111,9 @@ def run_unseen_adaptation_flow(
             arr = np.zeros((224, 224, 3), dtype=np.uint8)
             arr[:, :, 1] = 150 + (s * 3) % 20  # healthy green backdrop
             arr[:, :, 0] = 35 + (s * 2) % 15
-            arr[r1:r2, c1:c2, 0] = max(10, ch0 - (s * 2))
-            arr[r1:r2, c1:c2, 1] = max(10, ch1 + (s * 2))
-            support_images.append(arr)
+            arr[:, :, 2] = 25
+            arr[r1:r2, c1:c2, :] = color
+            support_images.append(_texturize(arr, seed=idx * 100 + s))
         support_data[cid] = support_images
 
         # Generate 10 query evaluation instances per class
@@ -111,9 +122,9 @@ def run_unseen_adaptation_flow(
             arr = np.zeros((224, 224, 3), dtype=np.uint8)
             arr[:, :, 1] = 152 + (q * 2) % 18
             arr[:, :, 0] = 36 + (q * 2) % 12
-            arr[r1:r2, c1:c2, 0] = max(10, ch0 - (q % 4))
-            arr[r1:r2, c1:c2, 1] = max(10, ch1 + (q % 4))
-            query_images.append(arr)
+            arr[:, :, 2] = 25
+            arr[r1:r2, c1:c2, :] = color
+            query_images.append(_texturize(arr, seed=idx * 100 + 20 + q))
         query_data[cid] = query_images
 
     # Step 2: Apply Few-Shot Prototype Adaptation & Dynamic Knowledge Registration

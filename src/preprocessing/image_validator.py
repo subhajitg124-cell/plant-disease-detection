@@ -17,11 +17,39 @@ class ImageValidator:
         self,
         min_width: int = 32,
         min_height: int = 32,
-        foliage_green_threshold: float = 0.05
+        foliage_green_threshold: float = 0.08,
+        texture_variance_threshold: float = 80.0,
+        edge_density_min: float = 0.03,
+        max_dim: int = 4096
     ):
         self.min_width = min_width
         self.min_height = min_height
         self.foliage_green_threshold = foliage_green_threshold
+        self.texture_variance_threshold = texture_variance_threshold
+        self.edge_density_min = edge_density_min
+        self.max_dim = max_dim
+
+    def evaluate_texture_and_edges(self, img: Image.Image) -> Tuple[float, float]:
+        """Returns (grayscale variance over plant-coloured pixels, Canny edge density)."""
+        img_arr = np.array(img)
+        h, w = img_arr.shape[:2]
+        if max(h, w) > self.max_dim:
+            scale = self.max_dim / float(max(h, w))
+            img_arr = cv2.resize(img_arr, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+            h, w = img_arr.shape[:2]
+
+        gray = cv2.cvtColor(img_arr, cv2.COLOR_RGB2GRAY)
+        hsv = cv2.cvtColor(img_arr, cv2.COLOR_RGB2HSV)
+        green = cv2.inRange(hsv, np.array([25, 30, 30]), np.array([95, 255, 255]))
+        brown = cv2.inRange(hsv, np.array([5, 30, 30]), np.array([25, 200, 200]))
+        plant_mask = cv2.bitwise_or(green, brown)
+
+        plant_pixels = gray[plant_mask > 0]
+        variance = float(np.var(plant_pixels)) if plant_pixels.size > 0 else 0.0
+
+        edges = cv2.Canny(gray, 50, 150)
+        edge_density = float(np.count_nonzero(edges)) / float(h * w)
+        return variance, edge_density
 
     def validate_file_integrity(self, input_source: Union[str, Image.Image, np.ndarray]) -> Tuple[bool, Optional[Image.Image], str]:
         if isinstance(input_source, str):
@@ -114,6 +142,24 @@ class ImageValidator:
                 "foliage_ratio": foliage_ratio,
                 "image": img
             }
+        if HAS_CV2:
+            variance, edge_density = self.evaluate_texture_and_edges(img)
+            if variance < self.texture_variance_threshold:
+                return {
+                    "is_valid": False,
+                    "status": PredictionStatus.NOT_A_PLANT.value,
+                    "reason": f"Image lacks natural leaf texture (variance {variance:.1f} < {self.texture_variance_threshold:.1f}). Please upload a real photo of a plant leaf, fruit, or flower.",
+                    "foliage_ratio": foliage_ratio,
+                    "image": img
+                }
+            if edge_density < self.edge_density_min:
+                return {
+                    "is_valid": False,
+                    "status": PredictionStatus.NOT_A_PLANT.value,
+                    "reason": f"Image appears to be a plain colour or graphic (edge density {edge_density:.3f} < {self.edge_density_min:.3f}), not a plant photo.",
+                    "foliage_ratio": foliage_ratio,
+                    "image": img
+                }
 
         return {
             "is_valid": True,

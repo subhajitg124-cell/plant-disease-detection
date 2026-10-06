@@ -13,7 +13,7 @@ class PreprocessingPipeline:
         self,
         target_size: Tuple[int, int] = (224, 224),
         augment: bool = False,
-        min_foliage_ratio: float = 0.05
+        min_foliage_ratio: float = 0.08
     ):
         self.transformer = ImageTransformer(target_size=target_size, augment=augment)
         self.validator = ImageValidator(foliage_green_threshold=min_foliage_ratio)

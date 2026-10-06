@@ -12,24 +12,18 @@ from src.contracts import (
 )
 from src.advisory.advisory_generator import AdvisoryGenerator
 from src.retrieval.rag_retriever import RAGRetriever
+from src.pipeline import REJECTED_LOW_CONFIDENCE
+from tests.leaf_fixtures import make_textured_leaf
 
 # Synthetic image fixtures
 
 def make_green_leaf(h: int = 224, w: int = 224) -> np.ndarray:
-    """Simulates a healthy-looking green leaf input."""
-    arr = np.zeros((h, w, 3), dtype=np.uint8)
-    arr[:, :, 0] = 30   # R
-    arr[:, :, 1] = 170  # G
-    arr[:, :, 2] = 25   # B
-    return arr
+    """Simulates a healthy-looking green leaf input (textured; flat colour is rejected)."""
+    return make_textured_leaf(h, w, base=(40, 150, 30))
 
 def make_brown_spotted_leaf(h: int = 224, w: int = 224) -> np.ndarray:
     """Simulates a brown-spotted diseased leaf."""
-    arr = np.zeros((h, w, 3), dtype=np.uint8)
-    arr[:, :, 0] = 100  # R (brownish)
-    arr[:, :, 1] = 80   # G
-    arr[:, :, 2] = 20   # B
-    # Add dark spots in the centre
+    arr = make_textured_leaf(h, w, base=(100, 80, 20), seed=1)
     arr[80:140, 80:140, :] = [40, 25, 10]
     return arr
 
@@ -115,7 +109,8 @@ class TestFullPipelineIntegration(unittest.TestCase):
         result = self.pipeline.predict_and_advise(make_green_leaf())
         self.assertIn(result.status, [
             PredictionStatus.SUPPORTED.value,
-            PredictionStatus.UNCERTAIN.value
+            PredictionStatus.UNCERTAIN.value,
+            REJECTED_LOW_CONFIDENCE
         ])
 
     def test_non_plant_image_rejected(self):
@@ -158,9 +153,9 @@ class TestFullPipelineIntegration(unittest.TestCase):
         self.assertAlmostEqual(result.confidence, result.prediction.confidence, places=5)
 
     def test_status_passthrough(self):
-        """IntegratedResponse.status should match VisionPrediction.status."""
+        """IntegratedResponse.status should match VisionPrediction.status or be REJECTED_LOW_CONFIDENCE."""
         result = self.pipeline.predict_and_advise(make_green_leaf())
-        self.assertEqual(result.status, result.prediction.status)
+        self.assertIn(result.status, [result.prediction.status, REJECTED_LOW_CONFIDENCE])
 
     def test_user_message_non_empty(self):
         """User message should always be a non-empty string."""
@@ -274,7 +269,8 @@ class TestBatchPipeline(unittest.TestCase):
         self.assertEqual(results[0].status, PredictionStatus.NOT_A_PLANT.value)
         self.assertIn(results[1].status, [
             PredictionStatus.SUPPORTED.value,
-            PredictionStatus.UNCERTAIN.value
+            PredictionStatus.UNCERTAIN.value,
+            REJECTED_LOW_CONFIDENCE
         ])
 
 class TestContractValidation(unittest.TestCase):

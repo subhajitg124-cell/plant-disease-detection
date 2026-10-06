@@ -13,6 +13,7 @@ from src.vision.model import PlantDiseaseCNN
 from src.vision.classifier import PlantDiseaseClassifier
 from src.vision.train import train_model
 from src.contracts import VisionPrediction, PredictionStatus
+from tests.leaf_fixtures import make_textured_leaf
 
 class TestVisionModule(unittest.TestCase):
 
@@ -30,9 +31,7 @@ class TestVisionModule(unittest.TestCase):
 
     def test_classifier_prediction_supported(self):
         classifier = PlantDiseaseClassifier()
-        img_arr = np.zeros((224, 224, 3), dtype=np.uint8)
-        img_arr[:, :, 1] = 200  # Green leaf
-        img_arr[:, :, 0] = 30
+        img_arr = make_textured_leaf(224, 224)
 
         pred = classifier.predict(img_arr)
         self.assertIsInstance(pred, VisionPrediction)
@@ -50,6 +49,10 @@ class TestVisionModule(unittest.TestCase):
         self.assertEqual(pred.canonical_id, "not_a_plant")
         self.assertEqual(pred.confidence, 0.0)
 
+    @unittest.skipUnless(
+        os.environ.get("RUN_TRAINING_TEST"),
+        "Retrains on the full dataset and overwrites models/plant_disease_cnn.pth; set RUN_TRAINING_TEST=1 to run.",
+    )
     def test_training_step(self):
         result = train_model(epochs=1, batch_size=8)
         self.assertEqual(result["status"], "success")

@@ -5,6 +5,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+NOT_A_PLANT_LABEL = "Not_a_plant"
+
+
+def not_a_plant_class_id(mapping: Dict[int, Dict[str, str]]) -> int:
+    """ID of the extra reject class: one past the highest disease class ID."""
+    return max(mapping) + 1
 
 
 def load_class_mapping(mapping_path: Path) -> Dict[int, Dict[str, str]]:
@@ -36,6 +42,7 @@ def discover_class_images(
     data_dir: Path,
     mapping: Dict[int, Dict[str, str]],
     max_images_per_class: Optional[int] = None,
+    include_not_a_plant: bool = False,
 ) -> Tuple[List[int], Dict[int, List[Path]], List[str]]:
     if not data_dir.is_dir():
         raise FileNotFoundError(f"PlantVillage image directory not found: {data_dir}")
@@ -46,7 +53,8 @@ def discover_class_images(
     unexpected = sorted(
         entry.name
         for entry in data_dir.iterdir()
-        if entry.is_dir() and entry.name not in label_to_id and not entry.name.startswith(".")
+        if entry.is_dir() and entry.name not in label_to_id
+        and entry.name != NOT_A_PLANT_LABEL and not entry.name.startswith(".")
     )
     if unexpected:
         raise ValueError(
@@ -72,6 +80,22 @@ def discover_class_images(
                 "at least 3 are needed for train/validation/test splits."
             )
         images_by_id[class_id] = images
+
+    if include_not_a_plant:
+        reject_dir = data_dir / NOT_A_PLANT_LABEL
+        reject_images = sorted(
+            path for path in reject_dir.glob("*")
+            if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
+        ) if reject_dir.is_dir() else []
+        if reject_images:
+            if max_images_per_class is not None:
+                reject_images = reject_images[:max_images_per_class]
+            if len(reject_images) < 3:
+                raise ValueError(
+                    f"{NOT_A_PLANT_LABEL} has only {len(reject_images)} image(s); "
+                    "at least 3 are needed for train/validation/test splits."
+                )
+            images_by_id[not_a_plant_class_id(mapping)] = reject_images
 
     if len(images_by_id) < 2:
         raise ValueError("At least two classes with images are required for training.")

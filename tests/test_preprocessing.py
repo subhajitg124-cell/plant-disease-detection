@@ -16,13 +16,24 @@ class TestPreprocessingPipeline(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
 
-        # Create valid green leaf synthetic image
-        green_arr = np.zeros((100, 100, 3), dtype=np.uint8)
-        green_arr[:, :, 1] = 200  # Strong green channel
-        green_arr[:, :, 0] = 30
-        green_arr[:, :, 2] = 20
-        self.valid_leaf_path = os.path.join(self.temp_dir.name, "green_leaf.jpg")
+        # Create textured green leaf synthetic image (veins + noise)
+        rng = np.random.default_rng(0)
+        green_arr = np.zeros((128, 128, 3), dtype=np.uint8)
+        green_arr[:, :, 1] = 150
+        green_arr[:, :, 0] = 40
+        green_arr[:, :, 2] = 30
+        noise = rng.integers(-40, 40, size=(128, 128, 1))
+        green_arr = np.clip(green_arr.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+        green_arr[::8, :, :] = (20, 70, 20)
+        green_arr[:, ::8, :] = (20, 70, 20)
+        self.valid_leaf_path = os.path.join(self.temp_dir.name, "green_leaf.png")
         Image.fromarray(green_arr).save(self.valid_leaf_path)
+
+        # Solid green (flat graphic) must be rejected
+        solid = np.zeros((100, 100, 3), dtype=np.uint8)
+        solid[:, :, 1] = 200
+        self.solid_green_path = os.path.join(self.temp_dir.name, "solid_green.png")
+        Image.fromarray(solid).save(self.solid_green_path)
 
         # Create non-plant grey noise synthetic image
         grey_arr = np.full((100, 100, 3), 128, dtype=np.uint8)
@@ -53,6 +64,12 @@ class TestPreprocessingPipeline(unittest.TestCase):
     def test_image_validator_not_a_plant(self):
         validator = ImageValidator()
         res = validator.validate(self.non_plant_path)
+        self.assertFalse(res["is_valid"])
+        self.assertEqual(res["status"], PredictionStatus.NOT_A_PLANT.value)
+
+    def test_image_validator_rejects_solid_green(self):
+        validator = ImageValidator()
+        res = validator.validate(self.solid_green_path)
         self.assertFalse(res["is_valid"])
         self.assertEqual(res["status"], PredictionStatus.NOT_A_PLANT.value)
 
