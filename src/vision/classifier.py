@@ -231,39 +231,78 @@ class PlantDiseaseClassifier:
                 embedding[0].detach().cpu().tolist() if extract_embedding else None
             )
 
-            # ── Entropy-based sanity check ───────────────────────────────────
-            # Softmax is a closed-set classifier: even random/non-plant images
-            # will produce a high-confidence peak because the probabilities must
-            # sum to 1.0.  We compute the normalised Shannon entropy of the full
-            # distribution.  A genuine plant image has a peaked distribution
-            # (low entropy IS expected), but we cross-check with the top-2 gap:
-            # non-plant images tend to have a dominant peak AND a near-zero gap
-            # to the second class, OR an implausibly high peak (>0.95) with all
-            # probability collapsed on one class.
+            # ── Out-of-Distribution (OOD) detection ─────────────────────────
+            # A closed-set CNN always outputs a class even for non-plant images.
+            # We use two complementary signals to detect OOD inputs:
             #
-            # Rule: if confidence > 0.95 AND the second-best class is < 0.02
-            # AND the model was NOT trained on this exact image (i.e. we have no
-            # real label), we treat it as a degenerate/garbage prediction.
+            # Signal A — Normalised Shannon entropy:
+            #   H_norm = -sum(p * log(p)) / log(num_classes)
+            #   Range: 0 (perfectly certain) → 1 (uniform / maximally uncertain)
+            #   For a genuine, well-calibrated plant prediction: H_norm < 0.45
+            #   For a confused OOD image: H_norm > 0.70 (probabilities spread out)
+            #
+            # Signal B — Degenerate collapse:
+            #   If top-1 > 0.97 AND top-2 < 0.01, the model has collapsed all
+            #   probability on one class — a sign of pathological / garbage input.
+            #
+            # Signal C — Weak top-5 concentration:
+            #   Real plant predictions have top-5 classes sum > 0.85.
+            #   If top-5 < 0.65 the model is highly uncertain across many classes.
+            n_classes = float(probabilities.shape[0])
+            eps = 1e-9
+            entropy = -float((probabilities * torch.log(probabilities + eps)).sum().item())
+            h_norm = entropy / float(np.log(n_classes)) if n_classes > 1 else 1.0
+
             sorted_probs, _ = torch.sort(probabilities, descending=True)
             top1_prob = float(sorted_probs[0].item())
             top2_prob = float(sorted_probs[1].item()) if len(sorted_probs) > 1 else 0.0
-            top2_gap = top1_prob - top2_prob
+            top5_sum  = float(sorted_probs[:5].sum().item())
 
-            # Suspicious: near-certain confidence with the 2nd class also near 0
-            # This only happens for garbage or trivially saturated inputs.
-            if top1_prob > 0.97 and top2_prob < 0.01:
+            # OOD if maximally uncertain (scattered distribution)
+            if h_norm > 0.80:
                 return VisionPrediction(
                     plant="Non-Plant / Unrecognised",
-                    disease="Invalid Image",
+                    disease="Image Not Recognised",
                     canonical_id="not_a_plant",
                     confidence=confidence,
                     status=PredictionStatus.NOT_A_PLANT.value,
-                    raw_label="entropy_rejected",
+                    raw_label="ood_high_entropy",
                     embedding=None,
                     model_version=str(
                         self.checkpoint_metadata.get("model_version", "vision_image_trained_v2")
                     )
                 )
+
+            # OOD if degenerate collapse (all mass on one class, nothing on others)
+            if top1_prob > 0.97 and top2_prob < 0.01:
+                return VisionPrediction(
+                    plant="Non-Plant / Unrecognised",
+                    disease="Image Not Recognised",
+                    canonical_id="not_a_plant",
+                    confidence=confidence,
+                    status=PredictionStatus.NOT_A_PLANT.value,
+                    raw_label="ood_degenerate",
+                    embedding=None,
+                    model_version=str(
+                        self.checkpoint_metadata.get("model_version", "vision_image_trained_v2")
+                    )
+                )
+
+            # OOD if top-5 classes don't even capture 65% of probability mass
+            if top5_sum < 0.65:
+                return VisionPrediction(
+                    plant="Non-Plant / Unrecognised",
+                    disease="Image Not Recognised",
+                    canonical_id="not_a_plant",
+                    confidence=confidence,
+                    status=PredictionStatus.NOT_A_PLANT.value,
+                    raw_label="ood_low_concentration",
+                    embedding=None,
+                    model_version=str(
+                        self.checkpoint_metadata.get("model_version", "vision_image_trained_v2")
+                    )
+                )
+
 
         if top_index >= len(self.model_class_ids):
             return self._unknown_prediction("The checkpoint class mapping is invalid.")

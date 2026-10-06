@@ -32,15 +32,22 @@ class ImageValidator:
         min_width: int = 32,
         min_height: int = 32,
         foliage_green_threshold: float = 0.08,
-        texture_variance_threshold: float = 80.0,
-        edge_density_min: float = 0.03,
+        # CALIBRATED: real leaf images have variance 15-600 over plant pixels;
+        # 80.0 was rejecting healthy close-up leaves. 15.0 still blocks
+        # pure solid-colour fills (variance < 5) and cartoons.
+        texture_variance_threshold: float = 15.0,
+        # CALIBRATED: Canny edges on a 224×224 close-up leaf are sparse (mainly
+        # veins). 0.03 was too high; 0.001 still blocks blank/solid images.
+        edge_density_min: float = 0.001,
         max_dim: int = 4096,
-        # minimum fraction of pixels with meaningful colour saturation
-        min_saturation_coverage: float = 0.10,
+        # CALIBRATED: lowered from 0.10 — slightly desaturated leaf photos
+        # (overcast light, white background) can have sat coverage ~0.05
+        min_saturation_coverage: float = 0.04,
         # maximum allowed fraction of sky-blue pixels
         max_sky_ratio: float = 0.60,
-        # minimum fraction of pixels where green channel dominates
-        min_green_dominance: float = 0.05,
+        # CALIBRATED: lowered from 0.05 — yellowing/diseased leaves and red/
+        # orange fruit images have very few pure-green-dominant pixels
+        min_green_dominance: float = 0.02,
     ):
         self.min_width = min_width
         self.min_height = min_height
@@ -260,8 +267,26 @@ class ImageValidator:
 
         # ── Layers 5, 6, 7 (cv2 required) ────────────────────────────────────
         if HAS_CV2:
-            # Layer 5: texture variance
             variance, edge_density = self.evaluate_texture_and_edges(img)
+
+            # Layer 6 first: Canny edge density
+            # A genuine leaf photo has at least some vein/margin edges.
+            # Solid-colour fills, cartoons and blank images have none.
+            if edge_density < self.edge_density_min:
+                return {
+                    "is_valid": False,
+                    "status": PredictionStatus.NOT_A_PLANT.value,
+                    "reason": (
+                        f"Image appears to be a plain colour or graphic "
+                        f"(edge density {edge_density:.4f} < {self.edge_density_min:.4f}), "
+                        "not a plant photo."
+                    ),
+                    "foliage_ratio": foliage_ratio,
+                    "image": img,
+                }
+
+            # Layer 5: texture variance over plant-coloured pixels.
+            # Blocks pure solid fills that somehow passed the edge check.
             if variance < self.texture_variance_threshold:
                 return {
                     "is_valid": False,
@@ -270,20 +295,6 @@ class ImageValidator:
                         f"Image lacks natural leaf texture "
                         f"(pixel variance {variance:.1f} < {self.texture_variance_threshold:.1f}). "
                         "Please upload a real photo of a plant leaf, fruit, or flower."
-                    ),
-                    "foliage_ratio": foliage_ratio,
-                    "image": img,
-                }
-
-            # Layer 6: Canny edge density
-            if edge_density < self.edge_density_min:
-                return {
-                    "is_valid": False,
-                    "status": PredictionStatus.NOT_A_PLANT.value,
-                    "reason": (
-                        f"Image appears to be a plain colour or graphic "
-                        f"(edge density {edge_density:.3f} < {self.edge_density_min:.3f}), "
-                        "not a plant photo."
                     ),
                     "foliage_ratio": foliage_ratio,
                     "image": img,
