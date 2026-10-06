@@ -30,7 +30,7 @@ try:
         class_mapping_path=os.path.join(ROOT_DIR, "data", "metadata", "plantvillage_class_mapping.csv"),
         kb_path=os.path.join(ROOT_DIR, "data", "knowledge_base", "agricultural_documents.json"),
         store_dir=os.path.join(ROOT_DIR, "models", "vector_index"),
-        confidence_threshold=0.50
+        confidence_threshold=0.70
     )
     print("[INFO] PlantDiseasePipeline initialized successfully.")
 except Exception as e:

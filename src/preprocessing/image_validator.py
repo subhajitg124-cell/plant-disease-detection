@@ -13,6 +13,20 @@ from src.contracts import PredictionStatus
 
 
 class ImageValidator:
+    """
+    Multi-layer plant image validator.
+
+    Validation layers (applied in order):
+      1. File / format integrity
+      2. Minimum dimension check
+      3. Colour-saturation check — rejects flat/grey images (screenshots, text docs)
+      4. Plant-colour coverage ratio — foliage HSV ranges (sky pixels excluded)
+      5. Texture variance — rejects solid-colour fills and cartoons
+      6. Canny edge density — rejects blank / near-blank images
+      7a. Sky-blue dominance — rejects landscape / outdoor non-plant photos
+      7b. Green-channel dominance — rejects faces, animals, buildings
+    """
+
     def __init__(
         self,
         min_width: int = 32,
@@ -20,7 +34,13 @@ class ImageValidator:
         foliage_green_threshold: float = 0.08,
         texture_variance_threshold: float = 80.0,
         edge_density_min: float = 0.03,
-        max_dim: int = 4096
+        max_dim: int = 4096,
+        # minimum fraction of pixels with meaningful colour saturation
+        min_saturation_coverage: float = 0.10,
+        # maximum allowed fraction of sky-blue pixels
+        max_sky_ratio: float = 0.60,
+        # minimum fraction of pixels where green channel dominates
+        min_green_dominance: float = 0.05,
     ):
         self.min_width = min_width
         self.min_height = min_height
@@ -28,6 +48,9 @@ class ImageValidator:
         self.texture_variance_threshold = texture_variance_threshold
         self.edge_density_min = edge_density_min
         self.max_dim = max_dim
+        self.min_saturation_coverage = min_saturation_coverage
+        self.max_sky_ratio = max_sky_ratio
+        self.min_green_dominance = min_green_dominance
 
     def evaluate_texture_and_edges(self, img: Image.Image) -> Tuple[float, float]:
         """Returns (grayscale variance over plant-coloured pixels, Canny edge density)."""
@@ -84,29 +107,46 @@ class ImageValidator:
             return False, f"Image dimensions ({width}x{height}) below minimum required ({self.min_width}x{self.min_height})."
         return True, "Dimensions valid."
 
+    def evaluate_saturation_coverage(self, img: Image.Image) -> float:
+        """Layer 3 — fraction of pixels with HSV saturation > 30 (meaningful colour)."""
+        img_arr = np.array(img)
+        if HAS_CV2:
+            hsv = cv2.cvtColor(img_arr, cv2.COLOR_RGB2HSV)
+            sat = hsv[:, :, 1]  # 0-255
+        else:
+            r = img_arr[:, :, 0].astype(np.float32)
+            g = img_arr[:, :, 1].astype(np.float32)
+            b = img_arr[:, :, 2].astype(np.float32)
+            max_c = np.maximum(np.maximum(r, g), b)
+            min_c = np.minimum(np.minimum(r, g), b)
+            v = max_c
+            sat = np.where(v > 0, (max_c - min_c) / (v + 1e-8) * 255.0, 0.0).astype(np.float32)
+        saturated = np.count_nonzero(sat > 30)
+        return float(saturated) / float(sat.size)
+
     def evaluate_plant_foliage_ratio(self, img: Image.Image) -> float:
+        """Layer 4 — fraction of pixels matching plant tissue colours (leaf/fruit/flower),
+        with sky-blue pixels explicitly excluded from the plant-colour mask."""
         img_arr = np.array(img)
 
         if HAS_CV2:
             hsv = cv2.cvtColor(img_arr, cv2.COLOR_RGB2HSV)
             # Green/yellow/brown foliar tissue and stem (10-105 hue, with saturation)
-            lower_green = np.array([10, 25, 20])
-            upper_green = np.array([105, 255, 255])
-            mask_green = cv2.inRange(hsv, lower_green, upper_green)
+            mask_green = cv2.inRange(hsv, np.array([10, 25, 20]), np.array([105, 255, 255]))
 
             # Red fruit tissue (tomato, apple, strawberry) — hue wraps at 0/180
-            lower_red1 = np.array([0, 50, 40])
-            upper_red1 = np.array([10, 255, 255])
-            lower_red2 = np.array([160, 50, 40])
-            upper_red2 = np.array([180, 255, 255])
-            mask_red = cv2.inRange(hsv, lower_red1, upper_red1) | cv2.inRange(hsv, lower_red2, upper_red2)
+            mask_red = (
+                cv2.inRange(hsv, np.array([0, 50, 40]), np.array([10, 255, 255])) |
+                cv2.inRange(hsv, np.array([160, 50, 40]), np.array([180, 255, 255]))
+            )
 
             # Pink / purple flower petals (130-165 hue)
-            lower_flower = np.array([130, 20, 60])
-            upper_flower = np.array([165, 255, 255])
-            mask_flower = cv2.inRange(hsv, lower_flower, upper_flower)
+            mask_flower = cv2.inRange(hsv, np.array([130, 20, 60]), np.array([165, 255, 255]))
 
-            combined = mask_green | mask_red | mask_flower
+            # Sky-blue exclusion — pixels that are sky-blue are NOT plant tissue
+            sky_mask = cv2.inRange(hsv, np.array([95, 40, 100]), np.array([130, 255, 255]))
+
+            combined = (mask_green | mask_red | mask_flower) & ~sky_mask
             ratio = np.count_nonzero(combined) / float(img_arr.shape[0] * img_arr.shape[1])
         else:
             r = img_arr[:, :, 0].astype(np.float32)
@@ -122,6 +162,9 @@ class ImageValidator:
                 ((r > 45) & (g > 25) & (b < 150) & (r > b + 12) & (g > b - 5)) |
                 ((r > 80) & (g > 80) & (b < 120) & (r + g > b * 2.2))
             )
+            # Exclude sky-blue from green plant mask
+            sky_mask_np = (b > r * 1.2) & (b > g * 1.1) & (b > 80)
+            green_mask = green_mask & ~sky_mask_np
 
             # Red fruit tissue (tomato, apple, strawberry, pepper)
             red_mask = (r > 100) & (r > g * 1.6) & (r > b * 1.6) & (diff > 30)
@@ -137,7 +180,32 @@ class ImageValidator:
 
         return float(ratio)
 
+    def evaluate_sky_ratio(self, img: Image.Image) -> float:
+        """Layer 7a — fraction of pixels in the sky-blue HSV range."""
+        if not HAS_CV2:
+            return 0.0
+        img_arr = np.array(img)
+        hsv = cv2.cvtColor(img_arr, cv2.COLOR_RGB2HSV)
+        sky_mask = cv2.inRange(hsv, np.array([95, 40, 100]), np.array([130, 255, 255]))
+        return float(np.count_nonzero(sky_mask)) / float(img_arr.shape[0] * img_arr.shape[1])
+
+    def evaluate_green_dominance(self, img: Image.Image) -> float:
+        """
+        Layer 7b — fraction of pixels where the green channel is the dominant channel
+        AND the pixel is not achromatic (grey/white/black).
+        Genuine plant images almost always have a meaningful green-dominant region.
+        """
+        img_arr = np.array(img).astype(np.float32)
+        r, g, b = img_arr[:, :, 0], img_arr[:, :, 1], img_arr[:, :, 2]
+        max_c = np.maximum(np.maximum(r, g), b)
+        min_c = np.minimum(np.minimum(r, g), b)
+        chroma = max_c - min_c  # 0 = achromatic (grey/white/black)
+
+        green_dominant = (g >= r) & (g >= b) & (chroma >= 15) & (g > 30)
+        return float(np.count_nonzero(green_dominant)) / float(g.size)
+
     def validate(self, input_source: Union[str, Image.Image, np.ndarray]) -> Dict[str, Any]:
+        # ── Layer 1: file / format integrity ──────────────────────────────────
         ok, img, msg = self.validate_file_integrity(input_source)
         if not ok or img is None:
             return {
@@ -145,9 +213,10 @@ class ImageValidator:
                 "status": PredictionStatus.NOT_A_PLANT.value,
                 "reason": msg,
                 "foliage_ratio": 0.0,
-                "image": None
+                "image": None,
             }
 
+        # ── Layer 2: minimum dimensions ───────────────────────────────────────
         ok_dim, dim_msg = self.validate_dimensions(img)
         if not ok_dim:
             return {
@@ -155,39 +224,100 @@ class ImageValidator:
                 "status": PredictionStatus.NOT_A_PLANT.value,
                 "reason": dim_msg,
                 "foliage_ratio": 0.0,
-                "image": None
+                "image": None,
             }
 
+        # ── Layer 3: colour saturation — rejects greyscale/text/documents ─────
+        sat_coverage = self.evaluate_saturation_coverage(img)
+        if sat_coverage < self.min_saturation_coverage:
+            return {
+                "is_valid": False,
+                "status": PredictionStatus.NOT_A_PLANT.value,
+                "reason": (
+                    f"Image appears to be greyscale or a document scan "
+                    f"(only {sat_coverage:.1%} of pixels have meaningful colour). "
+                    "Please upload a colour photo of a plant leaf, fruit, or flower."
+                ),
+                "foliage_ratio": 0.0,
+                "image": img,
+            }
+
+        # ── Layer 4: plant-colour coverage ────────────────────────────────────
         foliage_ratio = self.evaluate_plant_foliage_ratio(img)
         if foliage_ratio < self.foliage_green_threshold:
             return {
                 "is_valid": False,
                 "status": PredictionStatus.NOT_A_PLANT.value,
                 "reason": (
-                    f"Plant tissue coverage ratio ({foliage_ratio:.3f}) below threshold "
-                    f"({self.foliage_green_threshold:.3f}). Image does not appear to contain "
-                    "a recognisable plant leaf, fruit, or flower."
+                    f"Plant tissue coverage ratio ({foliage_ratio:.3f}) is below the "
+                    f"required threshold ({self.foliage_green_threshold:.3f}). "
+                    "The image does not appear to contain a recognisable plant leaf, "
+                    "fruit, or flower."
                 ),
                 "foliage_ratio": foliage_ratio,
-                "image": img
+                "image": img,
             }
+
+        # ── Layers 5, 6, 7 (cv2 required) ────────────────────────────────────
         if HAS_CV2:
+            # Layer 5: texture variance
             variance, edge_density = self.evaluate_texture_and_edges(img)
             if variance < self.texture_variance_threshold:
                 return {
                     "is_valid": False,
                     "status": PredictionStatus.NOT_A_PLANT.value,
-                    "reason": f"Image lacks natural leaf texture (variance {variance:.1f} < {self.texture_variance_threshold:.1f}). Please upload a real photo of a plant leaf, fruit, or flower.",
+                    "reason": (
+                        f"Image lacks natural leaf texture "
+                        f"(pixel variance {variance:.1f} < {self.texture_variance_threshold:.1f}). "
+                        "Please upload a real photo of a plant leaf, fruit, or flower."
+                    ),
                     "foliage_ratio": foliage_ratio,
-                    "image": img
+                    "image": img,
                 }
+
+            # Layer 6: Canny edge density
             if edge_density < self.edge_density_min:
                 return {
                     "is_valid": False,
                     "status": PredictionStatus.NOT_A_PLANT.value,
-                    "reason": f"Image appears to be a plain colour or graphic (edge density {edge_density:.3f} < {self.edge_density_min:.3f}), not a plant photo.",
+                    "reason": (
+                        f"Image appears to be a plain colour or graphic "
+                        f"(edge density {edge_density:.3f} < {self.edge_density_min:.3f}), "
+                        "not a plant photo."
+                    ),
                     "foliage_ratio": foliage_ratio,
-                    "image": img
+                    "image": img,
+                }
+
+            # Layer 7a: sky dominance — rejects landscape/outdoor non-plant photos
+            sky_ratio = self.evaluate_sky_ratio(img)
+            if sky_ratio > self.max_sky_ratio:
+                return {
+                    "is_valid": False,
+                    "status": PredictionStatus.NOT_A_PLANT.value,
+                    "reason": (
+                        f"Image is dominated by sky or background "
+                        f"({sky_ratio:.1%} sky-blue coverage). "
+                        "Please upload a close-up photo focused on a plant leaf, "
+                        "fruit, or flower."
+                    ),
+                    "foliage_ratio": foliage_ratio,
+                    "image": img,
+                }
+
+            # Layer 7b: green-channel dominance — rejects faces, animals, buildings
+            green_dom = self.evaluate_green_dominance(img)
+            if green_dom < self.min_green_dominance:
+                return {
+                    "is_valid": False,
+                    "status": PredictionStatus.NOT_A_PLANT.value,
+                    "reason": (
+                        f"Image does not contain sufficient green plant tissue "
+                        f"(green dominance score: {green_dom:.3f}). "
+                        "Please upload a photo of a plant leaf, fruit, or flower."
+                    ),
+                    "foliage_ratio": foliage_ratio,
+                    "image": img,
                 }
 
         return {
@@ -195,5 +325,5 @@ class ImageValidator:
             "status": PredictionStatus.SUPPORTED.value,
             "reason": "Image passed all plant validation checks.",
             "foliage_ratio": foliage_ratio,
-            "image": img
+            "image": img,
         }

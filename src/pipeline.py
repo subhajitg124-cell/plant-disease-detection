@@ -14,7 +14,9 @@ from src.retrieval.rag_retriever import RAGRetriever
 from src.advisory.advisory_generator import AdvisoryGenerator
 
 REJECTED_LOW_CONFIDENCE = "REJECTED_LOW_CONFIDENCE"
-MIN_CONFIDENCE_FLOOR = 0.60
+# Softmax on a 38-class model can peak at 0.60–0.85 even on random/non-plant
+# images, so 0.60 is not a meaningful gate. 0.70 is a much safer threshold.
+MIN_CONFIDENCE_FLOOR = 0.70
 
 
 class PlantDiseasePipeline:
@@ -24,10 +26,10 @@ class PlantDiseasePipeline:
         class_mapping_path: str = "data/metadata/plantvillage_class_mapping.csv",
         kb_path: str = "data/knowledge_base/agricultural_documents.json",
         store_dir: str = "models/vector_index",
-        confidence_threshold: float = 0.60,
+        confidence_threshold: float = 0.70,
         device: Optional[str] = None
     ):
-        # Never allow the gate to drop below the 0.60 floor.
+        # Never allow the gate to drop below the 0.70 floor.
         self.confidence_threshold = max(float(confidence_threshold), MIN_CONFIDENCE_FLOOR)
         self.classifier = PlantDiseaseClassifier(
             model_path=model_path,

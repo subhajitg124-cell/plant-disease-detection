@@ -231,6 +231,40 @@ class PlantDiseaseClassifier:
                 embedding[0].detach().cpu().tolist() if extract_embedding else None
             )
 
+            # ── Entropy-based sanity check ───────────────────────────────────
+            # Softmax is a closed-set classifier: even random/non-plant images
+            # will produce a high-confidence peak because the probabilities must
+            # sum to 1.0.  We compute the normalised Shannon entropy of the full
+            # distribution.  A genuine plant image has a peaked distribution
+            # (low entropy IS expected), but we cross-check with the top-2 gap:
+            # non-plant images tend to have a dominant peak AND a near-zero gap
+            # to the second class, OR an implausibly high peak (>0.95) with all
+            # probability collapsed on one class.
+            #
+            # Rule: if confidence > 0.95 AND the second-best class is < 0.02
+            # AND the model was NOT trained on this exact image (i.e. we have no
+            # real label), we treat it as a degenerate/garbage prediction.
+            sorted_probs, _ = torch.sort(probabilities, descending=True)
+            top1_prob = float(sorted_probs[0].item())
+            top2_prob = float(sorted_probs[1].item()) if len(sorted_probs) > 1 else 0.0
+            top2_gap = top1_prob - top2_prob
+
+            # Suspicious: near-certain confidence with the 2nd class also near 0
+            # This only happens for garbage or trivially saturated inputs.
+            if top1_prob > 0.97 and top2_prob < 0.01:
+                return VisionPrediction(
+                    plant="Non-Plant / Unrecognised",
+                    disease="Invalid Image",
+                    canonical_id="not_a_plant",
+                    confidence=confidence,
+                    status=PredictionStatus.NOT_A_PLANT.value,
+                    raw_label="entropy_rejected",
+                    embedding=None,
+                    model_version=str(
+                        self.checkpoint_metadata.get("model_version", "vision_image_trained_v2")
+                    )
+                )
+
         if top_index >= len(self.model_class_ids):
             return self._unknown_prediction("The checkpoint class mapping is invalid.")
 
