@@ -1569,8 +1569,9 @@ function showToast(msg, type = 'info', ms = 3000) {
   toastTimer = setTimeout(() => { toast.className = 'toast hidden'; }, ms);
 }
 
-// ─── ROBUST LEAF VALIDATION ──────────────────────────────────────────────────
-// Validates whether the image contains foliar colors (green, olive, chlorosis, necrosis)
+// ─── ROBUST PLANT TISSUE VALIDATION ─────────────────────────────────────────
+// Validates whether the image contains plant tissue: leaf, fruit, flower, or stem
+// Accepts green, yellow, brown, olive, orange, red-fruit, pink/white flower tones
 function isLeafImage(imgElement) {
   try {
     const canvas = document.createElement('canvas');
@@ -1579,7 +1580,7 @@ function isLeafImage(imgElement) {
     const ctx = canvas.getContext('2d');
     ctx.drawImage(imgElement, 0, 0, 120, 120);
     const imgData = ctx.getImageData(0, 0, 120, 120).data;
-    let foliarPixels = 0;
+    let plantPixels = 0;
     const total = 120 * 120;
 
     for (let i = 0; i < imgData.length; i += 4) {
@@ -1587,28 +1588,55 @@ function isLeafImage(imgElement) {
       const max = Math.max(r, g, b), min = Math.min(r, g, b), diff = max - min;
 
       if (max < 8) continue; // Skip deep black masks
+      // Skip pure white background
+      if (r > 230 && g > 230 && b > 230 && diff < 20) continue;
+      // Skip pure blue background (sky/lab backdrop)
+      if (b > r + 40 && b > g + 30 && b > 90) continue;
 
-      // Green foliar tissue
-      const isGreen = (g > r * 0.90 && g > b * 1.05 && g > 25) || (g > 40 && g > r && g > b);
-      // Chlorotic yellow / pale green
+      // Green foliar tissue (leaf/stem)
+      const isGreen = (g > r * 0.88 && g > b * 1.05 && g > 25) || (g > 40 && g > r && g > b);
+      // Chlorotic yellow / pale green / fruit-yellow
       const isYellow = (r > 70 && g > 65 && b < 150 && r + g > b * 1.5 && diff > 10);
-      // Brown / necrotic lesion tissue
+      // Brown / necrotic lesion / bark tissue
       const isBrown = (r > 35 && r < 230 && g > 15 && g < 180 && b < 150 && r >= g - 8 && r > b + 6 && diff > 10);
       // Olive / dark foliage
-      const isOlive = (r >= 30 && r <= 160 && g >= 40 && g <= 170 && b <= 100);
-      // Orange rust pustules
-      const isOrange = (r > 90 && g > 30 && g < 140 && b < 80 && r > g * 1.15 && diff > 15);
+      const isOlive = (r >= 30 && r <= 160 && g >= 40 && g <= 170 && b <= 110);
+      // Orange rust pustules / fruit skin
+      const isOrange = (r > 90 && g > 30 && g < 150 && b < 90 && r > g * 1.15 && diff > 15);
+      // Red fruit / berries (tomato, apple)
+      const isRed = (r > 100 && r > g * 1.6 && r > b * 1.6 && diff > 30);
+      // Pink / white flower petals
+      const isPink = (r > 150 && b > 100 && g < r && r - g > 15 && diff < 80);
+      // Purple / blue-violet flower
+      const isPurple = (b > 80 && r > 60 && g < r && g < b && diff > 15);
 
-      if (isGreen || isYellow || isBrown || isOlive || isOrange) {
-        foliarPixels++;
+      if (isGreen || isYellow || isBrown || isOlive || isOrange || isRed || isPink || isPurple) {
+        plantPixels++;
       }
     }
 
-    // At least 4% foliar pixels detected
-    return (foliarPixels / total) >= 0.04;
+    // At least 4% plant-tissue pixels required
+    return (plantPixels / total) >= 0.04;
   } catch (e) {
-    return true;
+    return true; // Fail open — let server validate
   }
+}
+
+// ─── CONVERT IMAGE TO BASE64 (canvas-based, always works for URL or data URI) ─
+function getImageAsBase64(imgElement) {
+  return new Promise((resolve) => {
+    try {
+      const cvs = document.createElement('canvas');
+      cvs.width = imgElement.naturalWidth || imgElement.width || 224;
+      cvs.height = imgElement.naturalHeight || imgElement.height || 224;
+      const ctx = cvs.getContext('2d');
+      ctx.drawImage(imgElement, 0, 0);
+      resolve(cvs.toDataURL('image/jpeg', 0.92));
+    } catch (e) {
+      // If CORS prevents canvas read (e.g., external URL), return the original src
+      resolve(imgElement.src);
+    }
+  });
 }
 
 // ─── FILE HANDLING ────────────────────────────────────────────────────────────
@@ -1640,13 +1668,19 @@ function handleFile(file) {
   reader.onload = (e) => {
     const img = new Image();
     img.onload = () => {
+      // ── Plant tissue validation before accepting upload ──
+      if (!isLeafImage(img)) {
+        showInvalid();
+        showToast('Not a plant image — please upload a leaf, fruit, or flower photo.', 'error', 4000);
+        return;
+      }
       previewImg.src = e.target.result;
       uploadedFile = file;
       showPreview();
       if (analyseBtn) analyseBtn.disabled = false;
-      if (analyseTxt) analyseTxt.textContent = 'Analyse Leaf Specimen';
-      showToast(`Leaf image loaded: ${file.name}`, 'info', 2000);
-      // Auto-trigger analysis for seamless instant diagnosis
+      if (analyseTxt) analyseTxt.textContent = 'Analyse Plant Specimen';
+      showToast(`Plant image loaded: ${file.name}`, 'info', 2000);
+      // Auto-trigger analysis
       runAnalysis();
     };
     img.src = e.target.result;
@@ -1913,78 +1947,89 @@ async function runAnalysis() {
   const t0 = performance.now();
 
   await runStage('ls-1', 250);
-  await runStage('ls-2', 650);
 
-  let result = null;
-  const sampleId = uploadedFile._sample;
-
-  // Try API candidate endpoints
-  const origin = window.location.origin && window.location.origin.startsWith('http') ? window.location.origin : '';
-  const apiCandidates = [
-    origin ? `${origin}/api/predict` : null,
-    'http://localhost:8000/api/predict',
-    'http://127.0.0.1:8000/api/predict'
-  ].filter(Boolean);
-
-  let apiSuccess = false;
-
-  for (const apiUrl of apiCandidates) {
-    try {
-      const resp = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image: previewImg.src,
-          filename: uploadedFile.name || '',
-          sample_id: sampleId || ''
-        }),
-        signal: AbortSignal.timeout(6000),
-      });
-
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data && data.canonical_id && data.canonical_id !== 'not_a_plant') {
-          const fullAdv = getAdvisory(data.canonical_id);
-          const rawAdv = data.advisory || {};
-          const mergedAdv = {
-            ...fullAdv,
-            ...rawAdv,
-            symptoms: rawAdv.symptoms?.length ? rawAdv.symptoms : fullAdv.symptoms,
-            causes: rawAdv.causes?.length ? rawAdv.causes : fullAdv.causes,
-            risk_factors: rawAdv.risk_factors?.length ? rawAdv.risk_factors : fullAdv.risk_factors,
-            prevention: rawAdv.prevention?.length ? rawAdv.prevention : fullAdv.prevention,
-            management: rawAdv.management?.length ? rawAdv.management : fullAdv.management,
-            sources: rawAdv.sources?.length ? rawAdv.sources : fullAdv.sources,
-          };
-
-          result = {
-            plant: data.plant || fullAdv.plant || 'Plant',
-            disease: data.disease || fullAdv.disease || 'Detected Condition',
-            canonical: data.canonical_id,
-            confidence: Number(data.confidence) || 0.92,
-            status: data.status || 'supported',
-            health_status: fullAdv.health_status || 'diseased',
-            pathogen: fullAdv.pathogen || 'Foliar Pathogen',
-            advisory: mergedAdv,
-            message: data.user_message || '',
-            source: 'PyTorch CNN + Vector RAG Model'
-          };
-          apiSuccess = true;
-          break;
-        }
-      }
-    } catch (err) {
-      // Try next endpoint
-    }
+  // ── Convert image to base64 BEFORE sending to API ──────────────────────────
+  // This is critical: previewImg.src may be an HTTP URL (for sample images),
+  // not a base64 data URI. The server needs raw image bytes via base64.
+  let imageBase64 = '';
+  try {
+    imageBase64 = await getImageAsBase64(previewImg);
+  } catch (e) {
+    imageBase64 = previewImg.src; // fallback
   }
 
-  // If backend is not available, execute client-side vision & feature diagnosis
+  await runStage('ls-2', 500);
+
+  let result = null;
+  const sampleId = uploadedFile._sample || '';
+  // Extract plant hint from sample_id (e.g. 'tomato_early_blight' → 'tomato')
+  const plantHint = sampleId ? sampleId.split('_')[0] : '';
+
+  // Determine the single best API endpoint (prefer same-origin to avoid CORS)
+  const origin = window.location.origin && window.location.origin.startsWith('http')
+    ? window.location.origin : 'http://localhost:8000';
+  const apiUrl = `${origin}/api/predict`;
+
+  let apiSuccess = false;
+  try {
+    const resp = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: imageBase64,
+        filename: uploadedFile.name || (sampleId ? `${sampleId}.jpg` : ''),
+        plant_hint: plantHint,
+        sample_id: sampleId
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data && data.canonical_id && data.canonical_id !== 'not_a_plant') {
+        const fullAdv = getAdvisory(data.canonical_id);
+        const rawAdv = data.advisory || {};
+        const mergedAdv = {
+          ...fullAdv,
+          ...rawAdv,
+          symptoms: rawAdv.symptoms?.length ? rawAdv.symptoms : (fullAdv?.symptoms || []),
+          causes: rawAdv.causes?.length ? rawAdv.causes : (fullAdv?.causes || []),
+          risk_factors: rawAdv.risk_factors?.length ? rawAdv.risk_factors : (fullAdv?.risk_factors || []),
+          prevention: rawAdv.prevention?.length ? rawAdv.prevention : (fullAdv?.prevention || []),
+          management: rawAdv.management?.length ? rawAdv.management : (fullAdv?.management || []),
+          sources: rawAdv.sources?.length ? rawAdv.sources : (fullAdv?.sources || []),
+        };
+        result = {
+          plant: data.plant || fullAdv?.plant || 'Plant',
+          disease: data.disease || fullAdv?.disease || 'Detected Condition',
+          canonical: data.canonical_id,
+          confidence: Number(data.confidence) || 0.92,
+          status: data.status || 'supported',
+          health_status: fullAdv?.health_status || 'diseased',
+          pathogen: fullAdv?.pathogen || 'Foliar Pathogen',
+          advisory: mergedAdv,
+          message: data.user_message || '',
+          source: 'PyTorch CNN + Vector RAG Model'
+        };
+        apiSuccess = true;
+      } else if (data && (data.status === 'not_a_plant' || data.canonical_id === 'not_a_plant')) {
+        // Server confirmed it's not a plant — show rejection UI
+        hideAll();
+        showInvalid();
+        showToast('Not a plant image — please upload a leaf, fruit, or flower.', 'error', 4500);
+        return;
+      }
+    }
+  } catch (err) {
+    // Network error or timeout — fall through to client-side
+  }
+
+  // ── Client-side fallback when backend unavailable ───────────────────────────
   if (!apiSuccess || !result) {
     const clientPrediction = await analyzeLeafClientSide(previewImg, uploadedFile.name || sampleId || '');
     const canonical = clientPrediction.canonical;
     const adv = getAdvisory(canonical);
     const conf = clientPrediction.confidence;
-
     result = {
       plant: adv.plant,
       disease: adv.disease,
@@ -1995,8 +2040,8 @@ async function runAnalysis() {
       pathogen: adv.pathogen,
       advisory: adv,
       message: adv.health_status === 'healthy'
-        ? `Diagnosed ${adv.plant} as Healthy Foliage with ${Math.round(conf * 1000) / 10}% accuracy. Tissue demonstrates optimal vitality.`
-        : `Identified ${adv.plant} — ${adv.disease} with ${Math.round(conf * 1000) / 10}% diagnostic accuracy. Actionable agronomic advisory retrieved.`,
+        ? `Diagnosed ${adv.plant} as Healthy Foliage with ${Math.round(conf * 1000) / 10}% accuracy.`
+        : `Identified ${adv.plant} — ${adv.disease} with ${Math.round(conf * 1000) / 10}% diagnostic accuracy.`,
       source: 'Client Vision AI Engine + Agricultural KB'
     };
   }

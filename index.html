@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
     rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌿</text></svg>" />
   <link rel="stylesheet" href="style.css" />
 </head>
 
@@ -102,7 +103,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
           </svg>
-          Leaf Image Upload
+          Plant Image Upload
         </h2>
         <span class="badge">CNN + RAG</span>
       </div>
@@ -123,8 +124,8 @@
               <circle cx="32" cy="30" r="5" fill="#22c55e" opacity="0.9" />
             </svg>
           </div>
-          <p class="upload-title">Drop your leaf photo here</p>
-          <p class="upload-hint" id="upload-hint">Supports JPG, PNG, WebP &mdash; click anywhere to browse</p>
+          <p class="upload-title">Drop your plant photo here</p>
+          <p class="upload-hint" id="upload-hint">Leaf, fruit, or flower &mdash; JPG, PNG, WebP &mdash; click to browse</p>
           <button class="btn-outline" id="browse-btn" type="button">Browse Files</button>
         </div>
 
@@ -147,9 +148,9 @@
             <path
               d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01" />
           </svg>
-          <p class="invalid-title">Not a Leaf Image</p>
-          <p class="invalid-sub">Please upload a clear photo of a plant leaf. The image you uploaded doesn't appear to
-            contain plant foliage.</p>
+          <p class="invalid-title">Not a Plant Image</p>
+          <p class="invalid-sub">Please upload a clear photo of a plant leaf, fruit, or flower.
+            The image you uploaded doesn't appear to contain recognisable plant tissue.</p>
           <button class="btn-outline" id="retry-btn" type="button">Try Another Image</button>
         </div>
       </div>
@@ -523,7 +524,7 @@
   <!-- Toast notifications -->
   <div id="toast" class="toast hidden" role="alert"></div>
 
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=7"></script>
 </body>
 
 </html>

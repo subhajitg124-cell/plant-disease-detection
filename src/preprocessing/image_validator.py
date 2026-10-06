@@ -86,14 +86,28 @@ class ImageValidator:
 
     def evaluate_plant_foliage_ratio(self, img: Image.Image) -> float:
         img_arr = np.array(img)
-        
+
         if HAS_CV2:
             hsv = cv2.cvtColor(img_arr, cv2.COLOR_RGB2HSV)
-            # Encompass green, yellow, olive, brown, and orange-tinted foliar tissue with minimum saturation
-            lower_foliage = np.array([10, 25, 20])
-            upper_foliage = np.array([105, 255, 255])
-            mask = cv2.inRange(hsv, lower_foliage, upper_foliage)
-            green_ratio = np.count_nonzero(mask) / float(img_arr.shape[0] * img_arr.shape[1])
+            # Green/yellow/brown foliar tissue and stem (10-105 hue, with saturation)
+            lower_green = np.array([10, 25, 20])
+            upper_green = np.array([105, 255, 255])
+            mask_green = cv2.inRange(hsv, lower_green, upper_green)
+
+            # Red fruit tissue (tomato, apple, strawberry) — hue wraps at 0/180
+            lower_red1 = np.array([0, 50, 40])
+            upper_red1 = np.array([10, 255, 255])
+            lower_red2 = np.array([160, 50, 40])
+            upper_red2 = np.array([180, 255, 255])
+            mask_red = cv2.inRange(hsv, lower_red1, upper_red1) | cv2.inRange(hsv, lower_red2, upper_red2)
+
+            # Pink / purple flower petals (130-165 hue)
+            lower_flower = np.array([130, 20, 60])
+            upper_flower = np.array([165, 255, 255])
+            mask_flower = cv2.inRange(hsv, lower_flower, upper_flower)
+
+            combined = mask_green | mask_red | mask_flower
+            ratio = np.count_nonzero(combined) / float(img_arr.shape[0] * img_arr.shape[1])
         else:
             r = img_arr[:, :, 0].astype(np.float32)
             g = img_arr[:, :, 1].astype(np.float32)
@@ -102,15 +116,26 @@ class ImageValidator:
             min_c = np.minimum(np.minimum(r, g), b)
             diff = max_c - min_c
 
-            # Match healthy green leaves, yellow chlorosis, and brown foliar necrosis with non-neutral saturation
+            # Healthy green / olive / yellow-green foliar tissue
             green_mask = (diff >= 12) & (
                 ((g > r * 0.85) & (g > b * 1.05) & (g > 30)) |
                 ((r > 45) & (g > 25) & (b < 150) & (r > b + 12) & (g > b - 5)) |
                 ((r > 80) & (g > 80) & (b < 120) & (r + g > b * 2.2))
             )
-            green_ratio = np.count_nonzero(green_mask) / float(img_arr.shape[0] * img_arr.shape[1])
 
-        return float(green_ratio)
+            # Red fruit tissue (tomato, apple, strawberry, pepper)
+            red_mask = (r > 100) & (r > g * 1.6) & (r > b * 1.6) & (diff > 30)
+
+            # Pink / purple flower petals
+            flower_mask = (diff >= 10) & (
+                ((r > 140) & (b > 100) & (g < r) & ((r - g) > 15)) |  # pink
+                ((b > 80) & (r > 60) & (g < r) & (g < b) & (diff > 15))  # purple
+            )
+
+            plant_mask = green_mask | red_mask | flower_mask
+            ratio = np.count_nonzero(plant_mask) / float(img_arr.shape[0] * img_arr.shape[1])
+
+        return float(ratio)
 
     def validate(self, input_source: Union[str, Image.Image, np.ndarray]) -> Dict[str, Any]:
         ok, img, msg = self.validate_file_integrity(input_source)
@@ -138,7 +163,11 @@ class ImageValidator:
             return {
                 "is_valid": False,
                 "status": PredictionStatus.NOT_A_PLANT.value,
-                "reason": f"Foliage coverage ratio ({foliage_ratio:.3f}) below threshold ({self.foliage_green_threshold:.3f}). Image does not appear to contain a recognized plant.",
+                "reason": (
+                    f"Plant tissue coverage ratio ({foliage_ratio:.3f}) below threshold "
+                    f"({self.foliage_green_threshold:.3f}). Image does not appear to contain "
+                    "a recognisable plant leaf, fruit, or flower."
+                ),
                 "foliage_ratio": foliage_ratio,
                 "image": img
             }

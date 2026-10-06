@@ -55,6 +55,11 @@ class PatraDristiRequestHandler(SimpleHTTPRequestHandler):
         parsed_url = urlparse(self.path)
         path = parsed_url.path
 
+        if path == "/favicon.ico":
+            self.send_response(204)
+            self.end_headers()
+            return
+
         if path == "/api/health":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -104,19 +109,38 @@ class PatraDristiRequestHandler(SimpleHTTPRequestHandler):
             try:
                 data = json.loads(body.decode("utf-8"))
                 image_b64 = data.get("image", "")
-                if "," in image_b64:
+
+                # Strip data URI prefix if present (data:image/jpeg;base64,...)
+                if isinstance(image_b64, str) and "," in image_b64:
                     image_b64 = image_b64.split(",", 1)[1]
+
+                # Validate we have something that looks like base64
+                if not image_b64 or len(image_b64) < 100:
+                    self.send_response(400)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({
+                        "error": "No valid image data provided. Send a base64-encoded image in the 'image' field."
+                    }).encode("utf-8"))
+                    return
 
                 image_bytes = base64.b64decode(image_b64)
                 img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
                 filename = data.get("filename", "").lower()
-                plant_hint = data.get("plant_hint", "").lower()
+                # Accept plant_hint from request body (supports both field names)
+                plant_hint = (
+                    data.get("plant_hint", "")
+                    or data.get("sample_id", "").split("_")[0]
+                ).lower()
 
                 if pipeline_instance:
                     res = pipeline_instance.predict_and_advise(
                         img, plant_hint=plant_hint, filename=filename
                     )
+
+                    # For not_a_plant results, return 200 with status field
+                    # (not 400) so the frontend can display a proper rejection UI
                     advisory_dict = None
                     if res.advisory:
                         advisory_dict = {
@@ -152,6 +176,13 @@ class PatraDristiRequestHandler(SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps(response_payload).encode("utf-8"))
 
+            except base64.binascii.Error as e:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "error": f"Invalid base64 image data: {str(e)}. Ensure the image is base64-encoded."
+                }).encode("utf-8"))
             except Exception as e:
                 self.send_response(400)
                 self.send_header("Content-Type", "application/json")
