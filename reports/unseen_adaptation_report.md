@@ -5,7 +5,7 @@
 - **Unseen Classes Ingested**: `4`
 - **Adapted Taxonomies**: `cassava_brown_streak, rice_blast, wheat_leaf_rust, cotton_bacterial_blight`
 - **Support Shots per Class**: `5-shot`
-- **Adaptation Time**: `288.98 ms`
+- **Adaptation Time**: `278.9 ms`
 - **Query Evaluation Accuracy**: `100.00%`
 
 ## 2. Unseen Diagnostic & Grounded Advisory Verification

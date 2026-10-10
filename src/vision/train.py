@@ -184,6 +184,8 @@ def train_model(
     max_images_per_class: Optional[int] = None,
     device: Optional[str] = None,
     num_workers: int = 0,
+    init_from: Optional[str] = None,
+    report_path: str = "reports/training_report.json",
 ) -> Dict[str, Any]:
     missing_dependencies = []
     if not HAS_TORCH:
@@ -271,6 +273,42 @@ def train_model(
     weights = weights / weights.mean()
 
     model = PlantDiseaseCNN(num_classes=len(class_ids), embedding_dim=128).to(device_obj)
+    if init_from:
+        initial_path = Path(init_from)
+        if not initial_path.is_absolute():
+            initial_path = ROOT_DIR / initial_path
+        initial_checkpoint = torch.load(initial_path, map_location="cpu")
+        initial_state = (
+            initial_checkpoint.get("state_dict", initial_checkpoint)
+            if isinstance(initial_checkpoint, dict) else initial_checkpoint
+        )
+        if not isinstance(initial_state, dict):
+            raise ValueError(f"Initial checkpoint is invalid: {initial_path}")
+        # Keep learned leaf features and plant class weights, while adding the
+        # new non-plant output as an additional class.
+        compatible_state = {
+            key: value for key, value in initial_state.items()
+            if key in model.state_dict() and model.state_dict()[key].shape == value.shape
+            and not key.startswith("classifier.")
+        }
+        model.load_state_dict(compatible_state, strict=False)
+        previous_ids = (
+            [int(class_id) for class_id in initial_checkpoint.get("class_ids", [])]
+            if isinstance(initial_checkpoint, dict) else []
+        )
+        previous_positions = {class_id: index for index, class_id in enumerate(previous_ids)}
+        source_weight = initial_state.get("classifier.weight")
+        source_bias = initial_state.get("classifier.bias")
+        if source_weight is not None and source_bias is not None:
+            with torch.no_grad():
+                model.classifier.weight.normal_(mean=0.0, std=0.02)
+                model.classifier.bias.zero_()
+                for target_index, class_id in enumerate(class_ids):
+                    source_index = previous_positions.get(class_id)
+                    if source_index is not None and source_index < source_weight.shape[0]:
+                        model.classifier.weight[target_index].copy_(source_weight[source_index])
+                        model.classifier.bias[target_index].copy_(source_bias[source_index])
+        print(f"Initialized from existing checkpoint {initial_path}")
     criterion = nn.CrossEntropyLoss(weight=weights)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -406,17 +444,14 @@ def train_model(
     torch.save(checkpoint, temporary_path)
     os.replace(temporary_path, output_path)
 
-    report_path = ROOT_DIR / "reports" / "training_report.json"
-    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_output_path = Path(report_path)
+    if not report_output_path.is_absolute():
+        report_output_path = ROOT_DIR / report_output_path
+    report_output_path.parent.mkdir(parents=True, exist_ok=True)
     report = {key: value for key, value in checkpoint.items() if key != "state_dict"}
     report["checkpoint_path"] = str(output_path)
-    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-
-    parent_models = ROOT_DIR.parent / "models"
-    if parent_models.exists() and parent_models.is_dir():
-        import shutil
-        shutil.copy2(output_path, parent_models / output_path.name)
-        print(f"Synced checkpoint to parent workspace: {parent_models / output_path.name}")
+    report_output_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    print(f"Training report saved to {report_output_path}")
 
     print(f"Checkpoint saved to {output_path}")
     print(
@@ -447,6 +482,8 @@ def main() -> None:
         "--mapping", default="data/metadata/plantvillage_class_mapping.csv"
     )
     parser.add_argument("--output", default="models/plant_disease_cnn.pth")
+    parser.add_argument("--init-from", default=None, help="Optional checkpoint to fine-tune while adding classes.")
+    parser.add_argument("--report", default="reports/training_report.json")
     parser.add_argument("--val-ratio", type=float, default=0.15)
     parser.add_argument("--test-ratio", type=float, default=0.15)
     parser.add_argument("--patience", type=int, default=5)
@@ -474,6 +511,8 @@ def main() -> None:
         max_images_per_class=args.max_images_per_class,
         device=args.device,
         num_workers=args.num_workers,
+        init_from=args.init_from,
+        report_path=args.report,
     )
     if result["status"] != "success":
         raise SystemExit(result.get("message", "Training did not complete."))

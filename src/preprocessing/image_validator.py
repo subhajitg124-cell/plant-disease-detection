@@ -24,24 +24,24 @@ class ImageValidator:
       5. Texture variance — rejects solid-colour fills and cartoons
       6. Canny edge density — rejects blank / near-blank images
       7a. Sky-blue dominance — rejects landscape / outdoor non-plant photos
-      7b. Green-channel dominance — rejects faces, animals, buildings
+      7b. Human detection — rejects portraits and full-body people before inference
     """
 
     def __init__(
         self,
         min_width: int = 32,
         min_height: int = 32,
-        # CALIBRATED: Plant foliage covers at least 5% of the frame (allowing leaves on tables/pots/gardens)
-        foliage_green_threshold: float = 0.05,
+        # Require visible green/yellow foliage; colored objects and fruit alone do not qualify as leaf images.
+        foliage_green_threshold: float = 0.08,
         # CALIBRATED: Pure flat graphics / blank fills have variance < 2.0; genuine leaves have >= 10.0
-        texture_variance_threshold: float = 10.0,
-        # CALIBRATED: Canny edge density on high-res camera photos of leaves is 0.002–0.02; blank/solid images have < 0.0005
-        edge_density_min: float = 0.002,
+        texture_variance_threshold: float = 4.0,
+        # CALIBRATED: Edge density floor applied in conjunction with variance floor to reject solid fills
+        edge_density_min: float = 0.0005,
         max_dim: int = 4096,
-        min_saturation_coverage: float = 0.04,
-        max_sky_ratio: float = 0.70,
-        # CALIBRATED: Even severely diseased/blighted brown or yellow leaves have at least 1% green/yellow foliar tissue
-        min_green_dominance: float = 0.01,
+        min_saturation_coverage: float = 0.03,
+        max_sky_ratio: float = 0.75,
+        # CALIBRATED: Diseased/blighted brown/yellow leaves often have low green-dominance; handled by foliage ratio
+        min_green_dominance: float = 0.0,
     ):
         self.min_width = min_width
         self.min_height = min_height
@@ -52,6 +52,48 @@ class ImageValidator:
         self.min_saturation_coverage = min_saturation_coverage
         self.max_sky_ratio = max_sky_ratio
         self.min_green_dominance = min_green_dominance
+        self._face_cascade = None
+        self._people_hog = None
+        if HAS_CV2:
+            try:
+                cascade_path = os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml")
+                cascade = cv2.CascadeClassifier(cascade_path)
+                if not cascade.empty():
+                    self._face_cascade = cascade
+            except (AttributeError, cv2.error, OSError):
+                # Keep validation usable in minimal OpenCV installations.
+                self._face_cascade = None
+            try:
+                people_hog = cv2.HOGDescriptor()
+                people_hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+                self._people_hog = people_hog
+            except (AttributeError, cv2.error):
+                self._people_hog = None
+
+    def detect_human(self, img: Image.Image) -> bool:
+        """Detect a visible face or upright pedestrian before plant classification."""
+        rgb = np.asarray(img)
+        height, width = rgb.shape[:2]
+        scale = min(1.0, 800.0 / max(height, width))
+        if scale < 1.0:
+            rgb = cv2.resize(rgb, (int(width * scale), int(height * scale)), interpolation=cv2.INTER_AREA)
+        gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+        if self._face_cascade is not None:
+            faces = self._face_cascade.detectMultiScale(
+                gray, scaleFactor=1.1, minNeighbors=5, minSize=(24, 24)
+            )
+            if len(faces) > 0:
+                return True
+        if self._people_hog is not None:
+            people, _ = self._people_hog.detectMultiScale(
+                gray,
+                hitThreshold=0.0,
+                winStride=(8, 8),
+                padding=(8, 8),
+                scale=1.05,
+            )
+            return len(people) > 0
+        return False
 
     def evaluate_texture_and_edges(self, img: Image.Image) -> Tuple[float, float]:
         """Returns (grayscale variance over plant-coloured pixels, Canny edge density)."""
@@ -126,28 +168,22 @@ class ImageValidator:
         return float(saturated) / float(sat.size)
 
     def evaluate_plant_foliage_ratio(self, img: Image.Image) -> float:
-        """Layer 4 — fraction of pixels matching plant tissue colours (leaf/fruit/flower),
-        with sky-blue pixels explicitly excluded from the plant-colour mask."""
+        """Layer 4 — fraction of pixels matching green or chlorotic yellow leaf tissue.
+
+        Green/yellow foliage is required so red fruit, flowers, skin, or other colorful
+        objects cannot pass the leaf upload gate by color alone.
+        """
         img_arr = np.array(img)
 
         if HAS_CV2:
             hsv = cv2.cvtColor(img_arr, cv2.COLOR_RGB2HSV)
-            # Green/yellow/brown foliar tissue and stem (10-105 hue, with saturation)
-            mask_green = cv2.inRange(hsv, np.array([10, 25, 20]), np.array([105, 255, 255]))
-
-            # Red fruit tissue (tomato, apple, strawberry) — hue wraps at 0/180
-            mask_red = (
-                cv2.inRange(hsv, np.array([0, 50, 40]), np.array([10, 255, 255])) |
-                cv2.inRange(hsv, np.array([160, 50, 40]), np.array([180, 255, 255]))
-            )
-
-            # Pink / purple flower petals (130-165 hue)
-            mask_flower = cv2.inRange(hsv, np.array([130, 20, 60]), np.array([165, 255, 255]))
+            # Green and chlorotic-yellow foliage; hue 10-105 excludes red/orange objects and flowers.
+            mask_green = cv2.inRange(hsv, np.array([10, 25, 25]), np.array([105, 255, 255]))
 
             # Sky-blue exclusion — pixels that are sky-blue are NOT plant tissue
             sky_mask = cv2.inRange(hsv, np.array([95, 40, 100]), np.array([130, 255, 255]))
 
-            combined = (mask_green | mask_red | mask_flower) & ~sky_mask
+            combined = mask_green & ~sky_mask
             ratio = np.count_nonzero(combined) / float(img_arr.shape[0] * img_arr.shape[1])
         else:
             r = img_arr[:, :, 0].astype(np.float32)
@@ -157,26 +193,16 @@ class ImageValidator:
             min_c = np.minimum(np.minimum(r, g), b)
             diff = max_c - min_c
 
-            # Healthy green / olive / yellow-green foliar tissue
+            # Green and chlorotic-yellow foliage only.
             green_mask = (diff >= 12) & (
                 ((g > r * 0.85) & (g > b * 1.05) & (g > 30)) |
-                ((r > 45) & (g > 25) & (b < 150) & (r > b + 12) & (g > b - 5)) |
-                ((r > 80) & (g > 80) & (b < 120) & (r + g > b * 2.2))
+                ((r > 70) & (g > 65) & (b < 140) & (r + g > b * 1.6) & (np.abs(r - g) < 55))
             )
             # Exclude sky-blue from green plant mask
             sky_mask_np = (b > r * 1.2) & (b > g * 1.1) & (b > 80)
             green_mask = green_mask & ~sky_mask_np
 
-            # Red fruit tissue (tomato, apple, strawberry, pepper)
-            red_mask = (r > 100) & (r > g * 1.6) & (r > b * 1.6) & (diff > 30)
-
-            # Pink / purple flower petals
-            flower_mask = (diff >= 10) & (
-                ((r > 140) & (b > 100) & (g < r) & ((r - g) > 15)) |  # pink
-                ((b > 80) & (r > 60) & (g < r) & (g < b) & (diff > 15))  # purple
-            )
-
-            plant_mask = green_mask | red_mask | flower_mask
+            plant_mask = green_mask
             ratio = np.count_nonzero(plant_mask) / float(img_arr.shape[0] * img_arr.shape[1])
 
         return float(ratio)
@@ -228,6 +254,17 @@ class ImageValidator:
                 "image": None,
             }
 
+        # Reject portraits before color heuristics: skin, hair, and green outdoor
+        # backgrounds can otherwise satisfy the foliage-pixel threshold.
+        if HAS_CV2 and self.detect_human(img):
+            return {
+                "is_valid": False,
+                "status": PredictionStatus.NOT_A_PLANT.value,
+                "reason": "A person was detected. Please upload a close-up photo of a plant leaf.",
+                "foliage_ratio": 0.0,
+                "image": img,
+            }
+
         # ── Layer 3: colour saturation — rejects greyscale/text/documents ─────
         sat_coverage = self.evaluate_saturation_coverage(img)
         if sat_coverage < self.min_saturation_coverage:
@@ -237,7 +274,7 @@ class ImageValidator:
                 "reason": (
                     f"Image appears to be greyscale or a document scan "
                     f"(only {sat_coverage:.1%} of pixels have meaningful colour). "
-                    "Please upload a colour photo of a plant leaf, fruit, or flower."
+                    "Please upload a colour photo focused on a plant leaf."
                 ),
                 "foliage_ratio": 0.0,
                 "image": img,
@@ -252,8 +289,7 @@ class ImageValidator:
                 "reason": (
                     f"Plant tissue coverage ratio ({foliage_ratio:.3f}) is below the "
                     f"required threshold ({self.foliage_green_threshold:.3f}). "
-                    "The image does not appear to contain a recognisable plant leaf, "
-                    "fruit, or flower."
+                    "The image does not appear to contain a recognisable plant leaf."
                 ),
                 "foliage_ratio": foliage_ratio,
                 "image": img,
@@ -263,32 +299,18 @@ class ImageValidator:
         if HAS_CV2:
             variance, edge_density = self.evaluate_texture_and_edges(img)
 
-            # Layer 6 first: Canny edge density
-            # A genuine leaf photo has at least some vein/margin edges.
-            # Solid-colour fills, cartoons and blank images have none.
-            if edge_density < self.edge_density_min:
+            # Layers 5 & 6: Texture variance and edge density check.
+            # Flat solid fills and pure digital graphics have near-zero variance (< 4.0)
+            # AND zero edge density (< 0.0005). Genuine leaves (even smooth close-ups or soft-focus)
+            # have natural organic variation and must not be rejected.
+            if variance < self.texture_variance_threshold and edge_density < self.edge_density_min:
                 return {
                     "is_valid": False,
                     "status": PredictionStatus.NOT_A_PLANT.value,
                     "reason": (
-                        f"Image appears to be a plain colour or graphic "
-                        f"(edge density {edge_density:.4f} < {self.edge_density_min:.4f}), "
-                        "not a plant photo."
-                    ),
-                    "foliage_ratio": foliage_ratio,
-                    "image": img,
-                }
-
-            # Layer 5: texture variance over plant-coloured pixels.
-            # Blocks pure solid fills that somehow passed the edge check.
-            if variance < self.texture_variance_threshold:
-                return {
-                    "is_valid": False,
-                    "status": PredictionStatus.NOT_A_PLANT.value,
-                    "reason": (
-                        f"Image lacks natural leaf texture "
-                        f"(pixel variance {variance:.1f} < {self.texture_variance_threshold:.1f}). "
-                        "Please upload a real photo of a plant leaf, fruit, or flower."
+                        f"Image appears to be a flat graphic or blank fill "
+                        f"(pixel variance {variance:.1f}, edge density {edge_density:.4f}), "
+                        "not a natural plant photo."
                     ),
                     "foliage_ratio": foliage_ratio,
                     "image": img,
@@ -304,26 +326,27 @@ class ImageValidator:
                         f"Image is dominated by sky or background "
                         f"({sky_ratio:.1%} sky-blue coverage). "
                         "Please upload a close-up photo focused on a plant leaf, "
-                        "fruit, or flower."
+                        "leaf."
                     ),
                     "foliage_ratio": foliage_ratio,
                     "image": img,
                 }
 
-            # Layer 7b: green-channel dominance — rejects faces, animals, buildings
-            green_dom = self.evaluate_green_dominance(img)
-            if green_dom < self.min_green_dominance:
-                return {
-                    "is_valid": False,
-                    "status": PredictionStatus.NOT_A_PLANT.value,
-                    "reason": (
-                        f"Image does not contain sufficient green plant tissue "
-                        f"(green dominance score: {green_dom:.3f}). "
-                        "Please upload a photo of a plant leaf, fruit, or flower."
-                    ),
-                    "foliage_ratio": foliage_ratio,
-                    "image": img,
-                }
+            # Layer 7b: green-channel dominance — only rejects if min_green_dominance > 0
+            if self.min_green_dominance > 0.0:
+                green_dom = self.evaluate_green_dominance(img)
+                if green_dom < self.min_green_dominance:
+                    return {
+                        "is_valid": False,
+                        "status": PredictionStatus.NOT_A_PLANT.value,
+                        "reason": (
+                            f"Image does not contain sufficient green plant tissue "
+                            f"(green dominance score: {green_dom:.3f}). "
+                            "Please upload a photo focused on a plant leaf."
+                        ),
+                        "foliage_ratio": foliage_ratio,
+                        "image": img,
+                    }
 
         return {
             "is_valid": True,

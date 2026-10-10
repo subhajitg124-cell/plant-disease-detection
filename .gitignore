@@ -28,6 +28,9 @@ models/*.h5
 data/raw/*
 data/processed/*
 data/external/*
+# Local account credentials and sessions created by server.py
+data/auth_accounts.sqlite3
+data/auth_accounts.sqlite3-*
 !data/raw/.gitkeep
 !data/raw/sample_leaves/**
 !data/processed/.gitkeep

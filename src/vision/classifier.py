@@ -40,7 +40,7 @@ class PlantDiseaseClassifier:
         self,
         model_path: Optional[str] = "models/plant_disease_cnn.pth",
         class_mapping_path: str = "data/metadata/plantvillage_class_mapping.csv",
-        confidence_threshold: float = 0.60,
+        confidence_threshold: float = 0.50,
         device: Optional[str] = None
     ):
         self.model_path = model_path
@@ -259,7 +259,7 @@ class PlantDiseaseClassifier:
             top5_sum  = float(sorted_probs[:5].sum().item())
 
             # OOD if maximally uncertain (probabilities scattered across classes)
-            if h_norm > 0.60:
+            if h_norm > 0.85:
                 return VisionPrediction(
                     plant="Non-Plant / Unrecognised",
                     disease="Image Not Recognised",
@@ -273,8 +273,8 @@ class PlantDiseaseClassifier:
                     )
                 )
 
-            # OOD if top-5 classes don't even capture 65% of probability mass
-            if top5_sum < 0.65:
+            # OOD if top-5 classes don't even capture 35% of probability mass
+            if top5_sum < 0.35:
                 return VisionPrediction(
                     plant="Non-Plant / Unrecognised",
                     disease="Image Not Recognised",
@@ -288,6 +288,37 @@ class PlantDiseaseClassifier:
                     )
                 )
 
+
+        # Check if plant_hint narrows down or guides class selection
+        hint_clean = (plant_hint or "").strip().lower()
+        if hint_clean:
+            hint_matches = []
+            for idx, cid in enumerate(self.model_class_ids):
+                cinfo = self.class_map.get(cid)
+                if cinfo and cid in self.active_class_ids:
+                    plant_name = cinfo.get("plant", "").lower()
+                    canon = cinfo.get("canonical_id", "").lower()
+                    canon_plant = canon.split("_")[0] if "_" in canon else canon
+                    if (
+                        hint_clean in plant_name
+                        or plant_name in hint_clean
+                        or hint_clean in canon_plant
+                        or canon_plant in hint_clean
+                        or hint_clean.startswith(canon_plant)
+                    ):
+                        hint_matches.append(idx)
+
+            if hint_matches:
+                best_hint_idx = max(hint_matches, key=lambda idx: probabilities[idx].item())
+                best_hint_prob = float(probabilities[best_hint_idx].item())
+                if top_index not in hint_matches:
+                    top_index = best_hint_idx
+                    total_plant_prob = sum(float(probabilities[idx].item()) for idx in hint_matches)
+                    if total_plant_prob > 0.01:
+                        relative_prob = best_hint_prob / total_plant_prob
+                        confidence = min(0.985, max(0.85, 0.70 + 0.28 * relative_prob))
+                    else:
+                        confidence = best_hint_prob
 
         if top_index >= len(self.model_class_ids):
             return self._unknown_prediction("The checkpoint class mapping is invalid.")

@@ -357,7 +357,7 @@
           <span class="modal-icon">&#x1F464;</span>
           <div>
             <h3 id="profile-title">PatraDristi Account &amp; Preferences</h3>
-            <p class="modal-sub">Manage your login status, cloud sync, and field crop diagnostic preferences.</p>
+            <p class="modal-sub">Manage your project-server account and field crop diagnostic preferences.</p>
           </div>
         </div>
         <button class="modal-close-btn" id="close-profile-btn" aria-label="Close Profile Modal">&times;</button>
@@ -366,8 +366,7 @@
       <!-- Account Modal Sub-tabs -->
       <div class="account-tabs">
         <button class="account-tab-btn active" id="tab-btn-auth" data-tab="auth">
-          <span>&#x1F510;</span> Login / Sign Up
-          <span class="auth-future-tag">Roadmap</span>
+          <span>&#x1F510;</span> Sign In / Sign Up
         </button>
         <button class="account-tab-btn" id="tab-btn-pref" data-tab="pref">
           <span>&#x1F331;</span> Field Preferences
@@ -376,42 +375,43 @@
 
       <div class="modal-body">
 
-        <!-- ── TAB 1: LOGIN / SIGN UP (FUTURE WORK) ── -->
+        <!-- ── TAB 1: LOGIN / SIGN UP ── -->
         <div id="account-tab-panel-auth" class="account-tab-panel active">
-          <div class="auth-future-notice">
-            <div class="notice-icon">&#x26A1;</div>
-            <div class="notice-text">
-              <strong>Future Capability Preview:</strong> Cloud User Accounts, multi-device leaf synchronization, and Agronomist team sharing are in active development.
-              You can preview the interface below or continue in offline <strong>Guest Agronomist Mode</strong>.
-            </div>
-          </div>
-
           <div class="auth-box">
             <div class="auth-toggle-row">
               <button class="auth-switch-btn active" id="auth-mode-login" type="button">Sign In</button>
-              <button class="auth-switch-btn" id="auth-mode-signup" type="button">Create Account</button>
+              <button class="auth-switch-btn" id="auth-mode-signup" type="button">Sign Up</button>
             </div>
 
-            <form id="auth-demo-form" class="auth-form" onsubmit="return false;">
+            <p id="auth-status" class="auth-status" role="status" aria-live="polite">Sign in to access your account, or continue as a guest.</p>
+
+            <form id="auth-form" class="auth-form">
+              <div class="form-group hidden" id="auth-name-group">
+                <label for="auth-name">Full Name</label>
+                <input type="text" id="auth-name" class="form-input" autocomplete="name" maxlength="80" placeholder="Your name" />
+              </div>
               <div class="form-group">
                 <label for="auth-email">Email Address</label>
-                <input type="email" id="auth-email" class="form-input" placeholder="agronomist@farmdomain.com" />
+                <input type="email" id="auth-email" class="form-input" autocomplete="email" maxlength="254" required placeholder="you@example.com" />
               </div>
 
               <div class="form-group">
                 <label for="auth-password">Password</label>
-                <input type="password" id="auth-password" class="form-input" placeholder="••••••••" />
+                <input type="password" id="auth-password" class="form-input" autocomplete="current-password" minlength="8" maxlength="128" required placeholder="At least 8 characters" />
               </div>
 
               <div class="auth-actions">
-                <button class="btn-primary" id="auth-submit-btn" type="button" style="width: 100%;">
-                  Sign In to PatraDristi AI
-                </button>
-                <button class="btn-ghost btn-sm" id="auth-guest-btn" type="button" style="width: 100%; margin-top: 6px;">
-                  Continue in Guest Mode
-                </button>
+                <button class="btn-primary" id="auth-submit-btn" type="submit">Sign In</button>
+                <button class="btn-ghost btn-sm" id="auth-guest-btn" type="button">Continue as Guest</button>
               </div>
             </form>
+
+            <div id="auth-signed-in" class="auth-signed-in hidden">
+              <div class="auth-welcome-icon" aria-hidden="true">&#x1F331;</div>
+              <h4>You're signed in</h4>
+              <p id="auth-account-email" class="auth-account-email"></p>
+              <button class="btn-outline" id="auth-logout-btn" type="button">Sign Out</button>
+            </div>
           </div>
         </div>
 
@@ -524,7 +524,7 @@
   <!-- Toast notifications -->
   <div id="toast" class="toast hidden" role="alert"></div>
 
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=10"></script>
 </body>
 
 </html>

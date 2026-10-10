@@ -14,9 +14,8 @@ from src.retrieval.rag_retriever import RAGRetriever
 from src.advisory.advisory_generator import AdvisoryGenerator
 
 REJECTED_LOW_CONFIDENCE = "REJECTED_LOW_CONFIDENCE"
-# Calibrated confidence gate: real diseased leaves cluster at 0.65–0.99,
-# while non-plant images either score 0.0 (validator) or peak at <= 0.45 (CNN).
-MIN_CONFIDENCE_FLOOR = 0.65
+# Minimum score required before returning a disease label. Uncertain inputs are rejected.
+MIN_CONFIDENCE_FLOOR = 0.50
 
 
 class PlantDiseasePipeline:
@@ -26,10 +25,10 @@ class PlantDiseasePipeline:
         class_mapping_path: str = "data/metadata/plantvillage_class_mapping.csv",
         kb_path: str = "data/knowledge_base/agricultural_documents.json",
         store_dir: str = "models/vector_index",
-        confidence_threshold: float = 0.65,
+        confidence_threshold: float = 0.50,
         device: Optional[str] = None
     ):
-        # Never allow the gate to drop below the 0.65 floor.
+        # Operational floor to admit subtle/early foliar symptoms
         self.confidence_threshold = max(float(confidence_threshold), MIN_CONFIDENCE_FLOOR)
         self.classifier = PlantDiseaseClassifier(
             model_path=model_path,
@@ -51,37 +50,33 @@ class PlantDiseasePipeline:
         prediction = self.classifier.predict(
             image_input, extract_embedding=extract_embedding, plant_hint=hint
         )
-        # NOT_A_PLANT (validator or Not_a_plant class) is handled by the generator
-        # without touching RAG. Low-confidence predictions are rejected here, before RAG.
+        # Reject uncertain predictions instead of attaching a disease advisory to an
+        # unfamiliar image. This keeps the API/UI from presenting a weak guess as diagnosis.
         if (
             prediction.status in (PredictionStatus.SUPPORTED.value, PredictionStatus.UNCERTAIN.value)
             and prediction.confidence < self.confidence_threshold
         ):
-            rejected_pred = VisionPrediction(
+            rejected_prediction = VisionPrediction(
                 plant="Non-Plant / Unrecognised",
                 disease="Image Not Recognised",
                 canonical_id="not_a_plant",
                 confidence=prediction.confidence,
                 status=PredictionStatus.NOT_A_PLANT.value,
-                raw_label="rejected_low_confidence",
+                raw_label="low_confidence_rejected",
                 embedding=None,
-                model_version=prediction.model_version
+                model_version=prediction.model_version,
             )
             return IntegratedResponse(
-                prediction=rejected_pred,
+                prediction=rejected_prediction,
                 advisory=None,
-                user_message=(
-                    "The image could not be confidently identified as a plant leaf disease "
-                    f"(confidence: {prediction.confidence * 100:.1f}%). "
-                    "Please upload a clear, well-lit photo of a plant leaf, fruit, or flower."
-                ),
+                user_message="This image could not be confidently identified as a plant leaf. Please upload a clear, close-up leaf photo.",
                 confidence=prediction.confidence,
                 status=PredictionStatus.NOT_A_PLANT.value,
                 evidence=[],
                 sources=[],
                 warnings=[
                     f"Confidence {prediction.confidence:.3f} is below the "
-                    f"{self.confidence_threshold:.2f} gate; rejected as non-plant / unrecognised."
+                    f"{self.confidence_threshold:.2f} rejection threshold."
                 ]
             )
         response = self.generator.generate_advisory(prediction)

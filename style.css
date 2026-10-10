@@ -833,34 +833,14 @@ body {
   text-transform: uppercase;
 }
 
-/* ── AUTH PREVIEW BOX ── */
-.auth-future-notice {
-  background: rgba(34, 197, 94, 0.08);
-  border: 1px solid var(--green-border);
-  border-radius: var(--radius-sm);
-  padding: 14px 16px;
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  margin-bottom: 18px;
-}
-.notice-icon {
-  font-size: 1.3rem;
-  line-height: 1;
-}
-.notice-text {
-  font-size: 0.82rem;
-  color: var(--text-dim);
-  line-height: 1.45;
-}
-.notice-text strong {
-  color: var(--green-light);
-}
+/* ── ACCOUNT AUTHENTICATION ── */
 .auth-box {
   background: var(--bg-card2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 22px;
+  max-width: 520px;
+  margin: 0 auto;
 }
 .auth-toggle-row {
   display: flex;
@@ -888,8 +868,25 @@ body {
   color: var(--text);
   box-shadow: 0 1px 4px rgba(0,0,0,0.3);
 }
+.auth-status {
+  min-height: 1.3em;
+  margin: 0 0 18px;
+  color: var(--text-dim);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+.auth-status.error { color: #fca5a5; }
+.auth-status.success { color: var(--green-light); }
+.auth-form .form-group { margin-bottom: 16px; }
+.auth-actions { display: grid; gap: 10px; margin-top: 22px; }
+.auth-actions > button { width: 100%; justify-content: center; }
+.auth-signed-in { text-align: center; padding: 12px 0 4px; }
+.auth-welcome-icon { font-size: 2rem; margin-bottom: 8px; }
+.auth-signed-in h4 { color: var(--text); margin: 0 0 6px; font-size: 1.05rem; }
+.auth-account-email { color: var(--text-dim); margin: 0 0 18px; overflow-wrap: anywhere; }
+.auth-signed-in .btn-outline { min-width: 140px; }
 .auth-actions {
-  margin-top: 20px;
+  margin-top: 22px;
 }
 
 /* ── FOOTER ── */

@@ -1574,10 +1574,14 @@ function showToast(msg, type = 'info', ms = 3000) {
 // Accepts green, yellow, brown, olive, orange, red-fruit, pink/white flower tones
 function isLeafImage(imgElement) {
   try {
+    if (!imgElement || !imgElement.complete || !imgElement.naturalWidth || !imgElement.naturalHeight) {
+      return false;
+    }
     const canvas = document.createElement('canvas');
     canvas.width = 120;
     canvas.height = 120;
     const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
     ctx.drawImage(imgElement, 0, 0, 120, 120);
     const imgData = ctx.getImageData(0, 0, 120, 120).data;
     let plantPixels = 0;
@@ -1616,10 +1620,11 @@ function isLeafImage(imgElement) {
     const foliageRatio = plantPixels / total;
     const greenRatio = greenFoliagePixels / total;
 
-    // Genuine plant leaves have at least 15% plant pixels and at least 4% green/yellow foliar pixels
-    return foliageRatio >= 0.15 && greenRatio >= 0.04;
+    // Require a meaningful amount of green/yellow foliage. This rejects photos
+    // of people, pets, food, and green backgrounds before sending them to diagnosis.
+    return foliageRatio >= 0.18 && greenRatio >= 0.06;
   } catch (e) {
-    return true; // Fail open — let server validate
+    return false;
   }
 }
 
@@ -1651,10 +1656,14 @@ function showPreview() {
   previewEl?.classList.remove('hidden');
   invalidEl?.classList.add('hidden');
 }
-function showInvalid() {
+function showInvalid(msg) {
   idleEl?.classList.add('hidden');
   previewEl?.classList.add('hidden');
   invalidEl?.classList.remove('hidden');
+  const sub = invalidEl?.querySelector('.invalid-sub');
+  if (sub && msg) {
+    sub.textContent = msg;
+  }
   if (analyseBtn) analyseBtn.disabled = true;
   if (analyseTxt) analyseTxt.textContent = 'Upload an image to analyse';
   uploadedFile = null;
@@ -1665,17 +1674,30 @@ function handleFile(file) {
     showToast('Please select a valid image file (JPG, PNG, WebP)', 'error');
     return;
   }
+  hideAll();
+  document.getElementById('results-empty')?.classList.remove('hidden');
   const reader = new FileReader();
   reader.onload = (e) => {
+    previewImg.onload = null;
+    previewImg.onerror = null;
+    previewImg.removeAttribute('src');
+    previewImg.onload = () => {
+      uploadedFile = file;
+      showPreview();
+      if (analyseBtn) analyseBtn.disabled = false;
+      if (analyseTxt) analyseTxt.textContent = 'Analyse Plant Specimen';
+      showToast(`Leaf image loaded: ${file.name}`, 'info', 2000);
+      // Auto-trigger analysis only after the upload passes leaf validation.
+      runAnalysis();
+    };
+    previewImg.onerror = () => {
+      uploadedFile = null;
+      showInvalid('The image could not be opened. Please select a valid leaf photo.');
+      showToast('Could not read that image. Please try another file.', 'error', 4500);
+    };
     previewImg.src = e.target.result;
-    uploadedFile = file;
-    showPreview();
-    if (analyseBtn) analyseBtn.disabled = false;
-    if (analyseTxt) analyseTxt.textContent = 'Analyse Plant Specimen';
-    showToast(`Specimen loaded: ${file.name}`, 'info', 2000);
-    // Auto-trigger analysis
-    runAnalysis();
   };
+  reader.onerror = () => showToast('Could not read that image file. Please try another one.', 'error', 4500);
   reader.readAsDataURL(file);
 }
 
@@ -1797,6 +1819,8 @@ document.querySelectorAll('.sample-chip').forEach(chip => {
 
 // ─── CLIENT-SIDE HIGH PRECISION LEAF & LESION ANALYZER ────────────────────────
 function analyzeLeafClientSide(imgEl, filename = '') {
+  // Deliberately disabled: pixel-color rules cannot determine a plant disease.
+  return Promise.resolve(null);
   return new Promise(resolve => {
     try {
       const cvs = document.createElement('canvas');
@@ -1850,6 +1874,7 @@ function analyzeLeafClientSide(imgEl, filename = '') {
       }
 
       const leafBase = Math.max(totalPixels - nonLeafBg, 1);
+      const foliarRatio  = leafBase / totalPixels;
       const brownRatio   = brownNecrosis / leafBase;
       const yellowRatio  = yellowChlorosis / leafBase;
       const rustRatio    = rustOrange / leafBase;
@@ -1859,6 +1884,11 @@ function analyzeLeafClientSide(imgEl, filename = '') {
 
       const diseaseScore = brownRatio * 1.2 + yellowRatio * 0.9 + rustRatio * 1.1 + darkRatio * 0.85 + mildewRatio * 0.95;
       const fn = (filename || '').toLowerCase();
+
+      // Only reject if the image has almost zero foliar tissue (less than 2% of frame)
+      if (foliarRatio < 0.02) {
+        return resolve({ canonical: 'not_a_plant', confidence: 0.0, status: 'not_a_plant' });
+      }
 
       // Check filename hints
       for (const cls of DISEASE_CLASSES) {
@@ -1883,18 +1913,19 @@ function analyzeLeafClientSide(imgEl, filename = '') {
       else if (fn.includes('orange') || fn.includes('citrus')) detectedPlant = 'orange';
 
       // Visual condition mapping
-      if (rustRatio > 0.08 || fn.includes('rust')) {
-        return resolve({ canonical: 'corn_common_rust', confidence: 0.935 + rustRatio * 0.1 });
+      if (rustRatio > 0.04 || fn.includes('rust')) {
+        const target = detectedPlant === 'apple' ? 'apple_cedar_apple_rust' : 'corn_common_rust';
+        return resolve({ canonical: target, confidence: 0.935 + rustRatio * 0.1 });
       }
-      if (mildewRatio > 0.15 || fn.includes('mildew') || fn.includes('powdery')) {
+      if (mildewRatio > 0.08 || fn.includes('mildew') || fn.includes('powdery')) {
         return resolve({ canonical: detectedPlant === 'cherry' ? 'cherry_powdery_mildew' : 'squash_powdery_mildew', confidence: 0.924 });
       }
-      if (diseaseScore > 0.04) {
-        if (darkRatio > 0.08 && brownRatio > 0.10) {
+      if (diseaseScore > 0.02) {
+        if (darkRatio > 0.05 && brownRatio > 0.08) {
           const target = detectedPlant === 'potato' ? 'potato_late_blight' : (detectedPlant === 'apple' ? 'apple_black_rot' : 'tomato_late_blight');
           return resolve({ canonical: target, confidence: 0.942 });
         }
-        if (yellowRatio > 0.22 && brownRatio < 0.06) {
+        if (yellowRatio > 0.15 && brownRatio < 0.08) {
           return resolve({ canonical: 'tomato_yellow_leaf_curl_virus', confidence: 0.918 });
         }
         if (fn.includes('scab') || detectedPlant === 'apple') {
@@ -1905,26 +1936,26 @@ function analyzeLeafClientSide(imgEl, filename = '') {
       }
 
       // Healthy classification
-      if (greenRatio > 0.20 && diseaseScore < 0.04) {
-        const healthyMap = {
-          apple: 'apple_healthy',
-          corn: 'corn_healthy',
-          grape: 'grape_healthy',
-          potato: 'potato_healthy',
-          pepper: 'bell_pepper_healthy',
-          cherry: 'cherry_healthy',
-          blueberry: 'blueberry_healthy',
-          soybean: 'soybean_healthy',
-          tomato: 'tomato_healthy'
-        };
-        const target = healthyMap[detectedPlant] || 'tomato_healthy';
-        return resolve({ canonical: target, confidence: 0.965 });
+      const healthyMap = {
+        apple: 'apple_healthy',
+        corn: 'corn_healthy',
+        grape: 'grape_healthy',
+        potato: 'potato_healthy',
+        pepper: 'bell_pepper_healthy',
+        cherry: 'cherry_healthy',
+        blueberry: 'blueberry_healthy',
+        soybean: 'soybean_healthy',
+        tomato: 'tomato_healthy'
+      };
+      const healthyTarget = healthyMap[detectedPlant] || 'tomato_healthy';
+      if (greenRatio > 0.08 && diseaseScore < 0.05) {
+        return resolve({ canonical: healthyTarget, confidence: 0.965 });
       }
 
-      // If specimen does not exhibit clear foliar disease signs or healthy leaf tissue, reject
-      return resolve({ canonical: 'not_a_plant', confidence: 0.0, status: 'not_a_plant' });
+      // Foliar tissue present with general appearance
+      return resolve({ canonical: healthyTarget, confidence: 0.880 });
     } catch (e) {
-      resolve({ canonical: 'not_a_plant', confidence: 0.0, status: 'not_a_plant' });
+      resolve({ canonical: 'tomato_healthy', confidence: 0.850 });
     }
   });
 }
@@ -1978,11 +2009,15 @@ async function runAnalysis() {
 
     if (resp.ok) {
       const data = await resp.json();
-      if (data && (data.status === 'not_a_plant' || data.canonical_id === 'not_a_plant' || data.status === 'REJECTED_LOW_CONFIDENCE')) {
-        // Server confirmed it's not a plant or confidence below threshold — show rejection UI
+      if (data && (
+        (data.status === 'not_a_plant' && data.canonical_id === 'not_a_plant') ||
+        data.status === 'REJECTED_LOW_CONFIDENCE'
+      )) {
+        // Do not present rejected or low-confidence input as a disease result.
         hideAll();
-        showInvalid();
-        showToast(data.user_message || 'Image could not be identified as a plant leaf disease. Please upload a clear photo of a plant leaf.', 'error', 4500);
+        const rejectMessage = data.user_message || 'This image could not be confidently identified as a plant leaf. Please upload a clear, close-up leaf photo.';
+        showInvalid(rejectMessage);
+        showToast(rejectMessage, 'error', 4500);
         return;
       } else if (data && data.canonical_id && data.canonical_id !== 'not_a_plant') {
         const fullAdv = getAdvisory(data.canonical_id);
@@ -2013,41 +2048,15 @@ async function runAnalysis() {
       }
     }
   } catch (err) {
-    // Network error or timeout — fall through to client-side
+    // No local color heuristic can safely replace the trained model.
   }
 
-  // ── Client-side fallback when backend unavailable ───────────────────────────
+  // Never invent a disease prediction when the trained prediction service is unavailable.
   if (!apiSuccess || !result) {
-    const clientPrediction = await analyzeLeafClientSide(previewImg, uploadedFile.name || sampleId || '');
-    if (!clientPrediction || clientPrediction.canonical === 'not_a_plant' || clientPrediction.status === 'not_a_plant') {
-      hideAll();
-      showInvalid();
-      showToast('Specimen could not be recognized as a supported plant condition. Please upload a clear leaf photo.', 'error', 4500);
-      return;
-    }
-    const canonical = clientPrediction.canonical;
-    const adv = getAdvisory(canonical);
-    if (!adv) {
-      hideAll();
-      showInvalid();
-      showToast('Specimen could not be recognized as a supported plant condition.', 'error', 4500);
-      return;
-    }
-    const conf = clientPrediction.confidence;
-    result = {
-      plant: adv.plant,
-      disease: adv.disease,
-      canonical: canonical,
-      confidence: conf,
-      status: 'supported',
-      health_status: adv.health_status,
-      pathogen: adv.pathogen,
-      advisory: adv,
-      message: adv.health_status === 'healthy'
-        ? `Diagnosed ${adv.plant} as Healthy Foliage with ${Math.round(conf * 1000) / 10}% accuracy.`
-        : `Identified ${adv.plant} — ${adv.disease} with ${Math.round(conf * 1000) / 10}% diagnostic accuracy.`,
-      source: 'Client Vision AI Engine + Agricultural KB'
-    };
+    hideAll();
+    showInvalid('The prediction service is unavailable, so no diagnosis was generated. Please start the server and try again.');
+    showToast('Prediction service unavailable. No disease prediction was made.', 'error', 4500);
+    return;
   }
 
   await runStage('ls-3', 200);
@@ -2608,58 +2617,157 @@ document.getElementById('tab-btn-pref')?.addEventListener('click', () => {
   document.getElementById('account-tab-panel-auth')?.classList.add('hidden');
 });
 
-// Auth Mode Toggle (Login vs Sign Up)
+// Local project-server account flow. Passwords are stored only as salted hashes
+// by server.py; this page never saves the password in browser storage.
 let currentAuthMode = 'login';
-document.getElementById('auth-mode-login')?.addEventListener('click', () => {
-  currentAuthMode = 'login';
-  document.getElementById('auth-mode-login')?.classList.add('active');
-  document.getElementById('auth-mode-signup')?.classList.remove('active');
+const authForm = document.getElementById('auth-form');
+const authStatus = document.getElementById('auth-status');
+const authNameGroup = document.getElementById('auth-name-group');
+const authNameInput = document.getElementById('auth-name');
+const authEmailInput = document.getElementById('auth-email');
+const authPasswordInput = document.getElementById('auth-password');
+const authSignedIn = document.getElementById('auth-signed-in');
+
+function authApiBase() {
+  return window.location.origin && window.location.origin.startsWith('http')
+    ? window.location.origin : 'http://localhost:8000';
+}
+
+function setAuthStatus(message, tone = '') {
+  if (!authStatus) return;
+  authStatus.textContent = message;
+  authStatus.className = `auth-status${tone ? ` ${tone}` : ''}`;
+}
+
+function renderAuthState(user) {
+  const modeToggle = document.querySelector('.auth-toggle-row');
+  const signedIn = Boolean(user?.email);
+  modeToggle?.classList.toggle('hidden', signedIn);
+  authForm?.classList.toggle('hidden', signedIn);
+  authSignedIn?.classList.toggle('hidden', !signedIn);
+  const accountEmail = document.getElementById('auth-account-email');
+  if (accountEmail) accountEmail.textContent = signedIn ? user.email : '';
+  if (signedIn) {
+    setAuthStatus(`Signed in as ${user.name}.`, 'success');
+  } else if (authStatus && !authStatus.classList.contains('error')) {
+    setAuthStatus('Sign in to access your account, or continue as a guest.');
+  }
+}
+
+function setAuthMode(mode) {
+  currentAuthMode = mode;
+  const signingUp = mode === 'signup';
+  document.getElementById('auth-mode-signup')?.classList.toggle('active', signingUp);
+  document.getElementById('auth-mode-login')?.classList.toggle('active', !signingUp);
+  authNameGroup?.classList.toggle('hidden', !signingUp);
+  if (authNameInput) authNameInput.required = signingUp;
+  if (authPasswordInput) authPasswordInput.autocomplete = signingUp ? 'new-password' : 'current-password';
   const submitBtn = document.getElementById('auth-submit-btn');
-  if (submitBtn) submitBtn.textContent = 'Sign In to PatraDristi AI';
-});
+  if (submitBtn) submitBtn.textContent = signingUp ? 'Create Account' : 'Sign In';
+  setAuthStatus(signingUp
+    ? 'Create an account to sign in on this project server.'
+    : 'Sign in to access your account, or continue as a guest.');
+}
 
-document.getElementById('auth-mode-signup')?.addEventListener('click', () => {
-  currentAuthMode = 'signup';
-  document.getElementById('auth-mode-signup')?.classList.add('active');
-  document.getElementById('auth-mode-login')?.classList.remove('active');
-  const submitBtn = document.getElementById('auth-submit-btn');
-  if (submitBtn) submitBtn.textContent = 'Create PatraDristi Account';
-});
-
-// Auth Submit Demo Handler
-document.getElementById('auth-submit-btn')?.addEventListener('click', () => {
-  const emailInput = document.getElementById('auth-email');
-  const email = emailInput?.value.trim() || 'agronomist@cropfield.io';
-  const nameFromEmail = email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-
+function storeAuthenticatedUser(user) {
   const profile = {
     ...getUserProfile(),
-    name: nameFromEmail || 'Crop Specialist',
+    name: user.name,
+    email: user.email,
     isLoggedIn: true,
     avatar: '👨‍🌾'
   };
-  saveUserProfile(profile);
-  closeModal('profile-modal');
-  showToast(`Signed in as ${profile.name}! (Offline Sync Ready)`, 'success');
+  try {
+    localStorage.setItem('patradristi_user_profile', JSON.stringify(profile));
+  } catch (e) {
+    console.error('Could not save account profile:', e);
+  }
+  updateProfileUI(profile);
+  renderAuthState(user);
+}
+
+async function refreshAuthState() {
+  try {
+    const response = await fetch(`${authApiBase()}/api/auth/session`, { credentials: 'same-origin' });
+    if (!response.ok) throw new Error('Account service is unavailable.');
+    const data = await response.json();
+    if (data.authenticated && data.user) {
+      storeAuthenticatedUser(data.user);
+      return;
+    }
+    const profile = { ...getUserProfile(), email: '', isLoggedIn: false, avatar: '👤' };
+    try { localStorage.setItem('patradristi_user_profile', JSON.stringify(profile)); } catch (e) { /* storage is optional */ }
+    updateProfileUI(profile);
+    renderAuthState(null);
+  } catch (error) {
+    renderAuthState(null);
+    setAuthStatus('For sign-in and sign-up, open the site from the project server at http://localhost:8000.', 'error');
+  }
+}
+
+document.getElementById('auth-mode-login')?.addEventListener('click', () => setAuthMode('login'));
+document.getElementById('auth-mode-signup')?.addEventListener('click', () => setAuthMode('signup'));
+
+authForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!authForm.reportValidity()) return;
+  const submitBtn = document.getElementById('auth-submit-btn');
+  if (submitBtn) submitBtn.disabled = true;
+  setAuthStatus(currentAuthMode === 'signup' ? 'Creating your account…' : 'Signing in…');
+  const payload = {
+    email: authEmailInput?.value.trim() || '',
+    password: authPasswordInput?.value || ''
+  };
+  if (currentAuthMode === 'signup') payload.name = authNameInput?.value.trim() || '';
+
+  try {
+    const response = await fetch(`${authApiBase()}/api/auth/${currentAuthMode}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Could not complete the account request.');
+    if (authPasswordInput) authPasswordInput.value = '';
+    storeAuthenticatedUser(data.user);
+    closeModal('profile-modal');
+    showToast(currentAuthMode === 'signup' ? 'Account created and signed in.' : 'Signed in successfully.', 'success');
+  } catch (error) {
+    setAuthStatus(error.message || 'Could not reach the account service.', 'error');
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
 });
 
-// Continue in Guest Mode Handler
-document.getElementById('auth-guest-btn')?.addEventListener('click', () => {
-  const profile = {
-    ...getUserProfile(),
-    name: '',
-    isLoggedIn: false,
-    avatar: '👤'
-  };
-  saveUserProfile(profile);
+async function signOut({ guestMode = false } = {}) {
+  try {
+    const response = await fetch(`${authApiBase()}/api/auth/logout`, {
+      method: 'POST', credentials: 'same-origin'
+    });
+    if (!response.ok) throw new Error('Could not sign out. Please try again.');
+  } catch (error) {
+    if (!guestMode || getUserProfile().isLoggedIn) {
+      setAuthStatus(error.message || 'Could not reach the account service.', 'error');
+      return;
+    }
+  }
+  const profile = { ...getUserProfile(), name: '', email: '', isLoggedIn: false, avatar: '👤' };
+  try { localStorage.setItem('patradristi_user_profile', JSON.stringify(profile)); } catch (e) { /* storage is optional */ }
+  updateProfileUI(profile);
+  renderAuthState(null);
   closeModal('profile-modal');
-  showToast('Operating in local Guest Agronomist mode', 'info');
-});
+  showToast(guestMode ? 'Continuing as a guest.' : 'Signed out successfully.', 'info');
+}
+
+document.getElementById('auth-logout-btn')?.addEventListener('click', () => signOut());
+document.getElementById('auth-guest-btn')?.addEventListener('click', () => signOut({ guestMode: true }));
 
 // Profile Modal
 document.getElementById('profile-btn')?.addEventListener('click', () => {
   updateProfileUI(getUserProfile());
   openModal('profile-modal');
+  refreshAuthState();
 });
 document.getElementById('close-profile-btn')?.addEventListener('click', () => closeModal('profile-modal'));
 document.getElementById('save-profile-btn')?.addEventListener('click', () => {
@@ -2669,10 +2777,11 @@ document.getElementById('save-profile-btn')?.addEventListener('click', () => {
   });
 
   const enteredName = document.getElementById('prof-name')?.value.trim();
+  const currentProfile = getUserProfile();
   const profile = {
-    ...getUserProfile(),
+    ...currentProfile,
     name: enteredName || '',
-    isLoggedIn: !!enteredName,
+    isLoggedIn: currentProfile.isLoggedIn,
     role: document.getElementById('prof-role')?.value || DEFAULT_PROFILE.role,
     farm: document.getElementById('prof-farm')?.value.trim() || DEFAULT_PROFILE.farm,
     location: document.getElementById('prof-location')?.value.trim() || DEFAULT_PROFILE.location,
@@ -2686,8 +2795,16 @@ document.getElementById('save-profile-btn')?.addEventListener('click', () => {
 });
 
 document.getElementById('reset-profile-btn')?.addEventListener('click', () => {
-  saveUserProfile(DEFAULT_PROFILE);
-  updateProfileUI(DEFAULT_PROFILE);
+  const currentProfile = getUserProfile();
+  const resetProfile = {
+    ...DEFAULT_PROFILE,
+    name: currentProfile.name,
+    email: currentProfile.email || '',
+    isLoggedIn: currentProfile.isLoggedIn,
+    avatar: currentProfile.avatar
+  };
+  saveUserProfile(resetProfile);
+  updateProfileUI(resetProfile);
   showToast('Reset profile to factory defaults', 'info');
 });
 
@@ -2778,11 +2895,15 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Initialize Profile and Diary on page load
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize Profile and Diary once the controls are available.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    updateProfileUI(getUserProfile());
+    refreshAuthState();
+  }, { once: true });
+} else {
   updateProfileUI(getUserProfile());
-});
-// Also run immediately if DOM is already ready
-updateProfileUI(getUserProfile());
+  refreshAuthState();
+}
 
 

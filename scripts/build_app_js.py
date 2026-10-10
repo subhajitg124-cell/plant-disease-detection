@@ -294,6 +294,8 @@ document.querySelectorAll('.sample-chip').forEach(chip => {
 
 // ─── CLIENT-SIDE HIGH PRECISION LEAF & LESION ANALYZER ────────────────────────
 function analyzeLeafClientSide(imgEl, filename = '') {
+  // Deliberately disabled: pixel-color rules cannot determine a plant disease.
+  return Promise.resolve(null);
   return new Promise(resolve => {
     try {
       const cvs = document.createElement('canvas');
@@ -465,6 +467,16 @@ async function runAnalysis() {
 
       if (resp.ok) {
         const data = await resp.json();
+        if (data && (
+          (data.status === 'not_a_plant' && data.canonical_id === 'not_a_plant') ||
+          data.status === 'REJECTED_LOW_CONFIDENCE'
+        )) {
+          hideAll();
+          const rejectMessage = data.user_message || 'This image could not be confidently identified as a plant leaf. Please upload a clear, close-up leaf photo.';
+          showInvalid(rejectMessage);
+          showToast(rejectMessage, 'error', 4500);
+          return;
+        }
         if (data && data.canonical_id && data.canonical_id !== 'not_a_plant') {
           const fullAdv = getAdvisory(data.canonical_id);
           const rawAdv = data.advisory || {};
@@ -500,27 +512,12 @@ async function runAnalysis() {
     }
   }
 
-  // If backend is not available, execute client-side vision & feature diagnosis
+  // Do not replace the trained model with a color-based disease guess.
   if (!apiSuccess || !result) {
-    const clientPrediction = await analyzeLeafClientSide(previewImg, uploadedFile.name || sampleId || '');
-    const canonical = clientPrediction.canonical;
-    const adv = getAdvisory(canonical);
-    const conf = clientPrediction.confidence;
-
-    result = {
-      plant: adv.plant,
-      disease: adv.disease,
-      canonical: canonical,
-      confidence: conf,
-      status: 'supported',
-      health_status: adv.health_status,
-      pathogen: adv.pathogen,
-      advisory: adv,
-      message: adv.health_status === 'healthy'
-        ? `Diagnosed ${adv.plant} as Healthy Foliage with ${Math.round(conf * 1000) / 10}% accuracy. Tissue demonstrates optimal vitality.`
-        : `Identified ${adv.plant} — ${adv.disease} with ${Math.round(conf * 1000) / 10}% diagnostic accuracy. Actionable agronomic advisory retrieved.`,
-      source: 'Client Vision AI Engine + Agricultural KB'
-    };
+    hideAll();
+    showInvalid('The prediction service is unavailable, so no diagnosis was generated. Please start the server and try again.');
+    showToast('Prediction service unavailable. No disease prediction was made.', 'error', 4500);
+    return;
   }
 
   await runStage('ls-3', 200);
