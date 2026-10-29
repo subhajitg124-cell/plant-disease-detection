@@ -254,9 +254,9 @@ body {
 }
 
 .preview-img-container.has-disease-glow {
-  border-color: rgba(239, 68, 68, 0.75);
-  box-shadow: 0 0 25px rgba(239, 68, 68, 0.45), 0 0 10px rgba(239, 68, 68, 0.3);
-  animation: container-disease-pulse 2.2s ease-in-out infinite;
+  border-color: rgba(239, 68, 68, 0.65);
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.25), 0 4px 12px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .disease-glow-canvas {

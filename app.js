@@ -2315,60 +2315,161 @@ function applyDiseaseRedGlow(imgEl, diagnosis) {
       let leafPixels = 0;
       let lesionPixels = 0;
 
-      // 4x4 spatial grid for hotspot centroids
-      const gridDim = 4;
+      // Stage 1: Build foliage map and coarse spatial grid to strictly isolate leaf from background
+      const CELL_SIZE = 8;
+      const gw = Math.ceil(w / CELL_SIZE);
+      const gh = Math.ceil(h / CELL_SIZE);
+      const foliageGrid = new Uint8Array(gw * gh);
+      const isLeafCandidate = new Uint8Array(w * h);
+
+      // Pass 1: Detect confirmed green foliage and chlorotic leaf tissue
+      for (let y = 0; y < h; y++) {
+        const gy = Math.floor(y / CELL_SIZE);
+        for (let x = 0; x < w; x++) {
+          const gx = Math.floor(x / CELL_SIZE);
+          const idx = y * w + x;
+          const i = idx * 4;
+          const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
+          if (a < 30) continue; // skip transparent pixels
+
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          const diff = max - min;
+          const s = max > 0 ? diff / max : 0;
+          const v = max / 255;
+
+          // Exclude neutral / achromatic background (gray surfaces, shadows, dark/white cards)
+          if (max < 28) continue; // deep black / shadow
+          if (diff < 18 || s < 0.13) continue; // neutral gray
+          if (r > 195 && g > 195 && b > 195 && diff < 26) continue; // white/light-gray card
+          if (b > r + 25 && b > g + 15 && b > 65) continue; // blue sky/cloth
+
+          let hue = 0;
+          if (diff > 0) {
+            if (max === r) hue = ((g - b) / diff + (g < b ? 6 : 0)) * 60;
+            else if (max === g) hue = ((b - r) / diff + 2) * 60;
+            else hue = ((r - g) / diff + 4) * 60;
+          }
+
+          // Green healthy foliage signature
+          const isGreenFoliage = (
+            (hue >= 46 && hue <= 170 && s >= 0.14 && v >= 0.12) ||
+            (g > r * 1.02 && g > b * 1.08 && g >= 30)
+          );
+          // Yellow-green chlorotic leaf tissue
+          const isYellowChlorotic = (
+            (hue >= 34 && hue < 46 && s >= 0.20 && v >= 0.18 && g > b * 1.15)
+          );
+
+          if (isGreenFoliage || isYellowChlorotic) {
+            isLeafCandidate[idx] = 1;
+            foliageGrid[gy * gw + gx] = 1;
+            leafPixels++;
+          }
+        }
+      }
+
+      // Dilate foliage grid by 1 cell (8-12px) to form a strict leaf boundary mask
+      const dilatedFoliageGrid = new Uint8Array(gw * gh);
+      for (let gy = 0; gy < gh; gy++) {
+        for (let gx = 0; gx < gw; gx++) {
+          if (foliageGrid[gy * gw + gx] === 1) {
+            for (let dy = -1; dy <= 1; dy++) {
+              const ny = gy + dy;
+              if (ny < 0 || ny >= gh) continue;
+              for (let dx = -1; dx <= 1; dx++) {
+                const nx = gx + dx;
+                if (nx < 0 || nx >= gw) continue;
+                dilatedFoliageGrid[ny * gw + nx] = 1;
+              }
+            }
+          }
+        }
+      }
+
+      // High-resolution 6x6 spatial grid for lesion hotspot centroids
+      const gridDim = 6;
       const cellW = w / gridDim;
       const cellH = h / gridDim;
       const gridAcc = Array.from({ length: gridDim * gridDim }, () => ({ count: 0, sumX: 0, sumY: 0 }));
 
+      // Pass 2: Detect genuine foliar disease lesions ONLY WITHIN leaf proximity
       for (let y = 0; y < h; y++) {
+        const gy = Math.floor(y / CELL_SIZE);
         for (let x = 0; x < w; x++) {
-          const i = (y * w + x) * 4;
-          const r = d[i], g = d[i + 1], b = d[i + 2];
+          const gx = Math.floor(x / CELL_SIZE);
+          const idx = y * w + x;
+
+          // HARD CONSTRAINT: Lesions MUST be on or immediately adjacent to genuine leaf foliage
+          if (dilatedFoliageGrid[gy * gw + gx] !== 1) {
+            continue; // 100% background: NEVER allowed to be marked as disease
+          }
+
+          const i = idx * 4;
+          const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
+          if (a < 30) continue;
+
           const max = Math.max(r, g, b);
           const min = Math.min(r, g, b);
           const diff = max - min;
+          const s = max > 0 ? diff / max : 0;
+          const v = max / 255;
 
-          // Background filter
-          if (max < 18) continue; // black
-          if (r > 205 && g > 205 && b > 205 && diff < 26) continue; // white/gray
-          if (b > r + 30 && b > g + 20 && b > 75) continue; // blue
+          // Reject neutral background / dark shadows even near leaf boundary
+          if (max < 26) continue;
+          if (diff < 16 || s < 0.13) continue; // neutral gray / paper
+          if (r > 195 && g > 195 && b > 195 && diff < 26) continue;
+          if (b > r + 20 && b > g + 10 && b > 60) continue;
 
-          leafPixels++;
+          let hue = 0;
+          if (diff > 0) {
+            if (max === r) hue = ((g - b) / diff + (g < b ? 6 : 0)) * 60;
+            else if (max === g) hue = ((b - r) / diff + 2) * 60;
+            else hue = ((r - g) / diff + 4) * 60;
+          }
 
-          const isHealthyGreen = (g > r * 1.05 && g > b * 1.05 && g > 35);
+          const isHealthyGreen = (g > r * 1.05 && g > b * 1.10 && g > 35 && hue >= 55 && hue <= 165);
 
           let score = 0;
-          // Dark necrotic lesion (blight, scab, rot)
-          if (!isHealthyGreen && max < 75 && max > 18) {
-            score = Math.max(score, (75 - max) / 55);
+
+          // 1. Brown necrosis (Early/Late blight, Alternaria, Septoria, Scab, Anthracnose, Rot)
+          // True foliar lesions have oxidized tannin pigmentation (warm reddish-brown: r > g, r > b)
+          if (r > 38 && r >= g && r > b * 1.25 && (r - b) >= 14 && s >= 0.16) {
+            const brownStrength = ((r - g) * 1.4 + (r - b)) / 50;
+            score = Math.max(score, Math.min(1.0, brownStrength));
           }
-          // Brown necrosis
-          if (r > 38 && r > g && r > b + 10 && g < 160) {
-            const brownVal = (r - g) + (r - b);
-            score = Math.max(score, Math.min(1.0, brownVal / 50));
+
+          // 2. Chlorotic yellow halos around disease sites (viral, fungal margin)
+          if (!isHealthyGreen && r > 85 && g > 80 && b < 130 && (r + g) > b * 2.1 && Math.abs(r - g) < 55 && s >= 0.22) {
+            score = Math.max(score, 0.72);
           }
-          // Chlorotic yellow halos
-          if (!isHealthyGreen && r > 90 && g > 85 && b < 125 && (r + g) > b * 2.2 && Math.abs(r - g) < 55) {
-            score = Math.max(score, 0.7);
+
+          // 3. Rust orange pustules (Common rust, Cedar rust)
+          if (r > 100 && r > g * 1.18 && r > b * 1.45 && s >= 0.30) {
+            score = Math.max(score, Math.min(1.0, (r - g * 1.1) / 42));
           }
-          // Rust orange pustules
-          if (r > 105 && r > g * 1.2 && r > b * 1.4) {
-            score = Math.max(score, Math.min(1.0, (r - g * 1.1) / 45));
+
+          // 4. Dark necrotic spots / Pycnidia on leaf surface (Bacterial speck/spot)
+          if (!isHealthyGreen && max <= 80 && max >= 26 && (r >= b + 4 || r >= g) && s >= 0.14) {
+            score = Math.max(score, (80 - max) / 54);
           }
-          // Powdery mildew
-          if (r > 145 && g > 145 && b > 135 && diff < 25 && max < 215) {
+
+          // 5. Powdery mildew (Whitish fungal colonies strictly bordered by green leaf)
+          if (r > 140 && g > 140 && b > 130 && diff < 24 && max < 215 && isLeafCandidate[idx] === 1) {
             score = Math.max(score, 0.75);
           }
 
-          if (score > 0.25) {
+          if (score > 0.28) {
             const val = Math.min(255, Math.round(score * 255));
-            mask[y * w + x] = val;
+            mask[idx] = val;
             lesionPixels++;
+            if (isLeafCandidate[idx] === 0) {
+              leafPixels++; // count necrotic margin pixels into leaf total
+            }
 
-            const gx = Math.min(gridDim - 1, Math.floor(x / cellW));
-            const gy = Math.min(gridDim - 1, Math.floor(y / cellH));
-            const gIdx = gy * gridDim + gx;
+            const gxCell = Math.min(gridDim - 1, Math.floor(x / cellW));
+            const gyCell = Math.min(gridDim - 1, Math.floor(y / cellH));
+            const gIdx = gyCell * gridDim + gxCell;
             gridAcc[gIdx].count += val;
             gridAcc[gIdx].sumX += x * val;
             gridAcc[gIdx].sumY += y * val;
@@ -2376,18 +2477,37 @@ function applyDiseaseRedGlow(imgEl, diagnosis) {
         }
       }
 
-      // Fallback: if lesion color heuristics were sparse but disease was confirmed by CNN
-      if (lesionPixels < leafPixels * 0.05 && leafPixels > 100) {
-        for (let y = 0; y < h; y++) {
-          for (let x = 0; x < w; x++) {
-            const i = (y * w + x) * 4;
-            const r = d[i], g = d[i + 1], b = d[i + 2];
-            const max = Math.max(r, g, b);
-            const min = Math.min(r, g, b);
-            if (max < 18 || (r > 205 && g > 205 && b > 205 && max - min < 26)) continue;
-            if (!(g > r * 1.08 && g > b * 1.08)) {
-              mask[y * w + x] = 180;
-              lesionPixels++;
+      // Adaptive check for subtle symptoms: ONLY inspect confirmed leaf pixels (never background)
+      if (lesionPixels === 0 && leafPixels > 80) {
+        let sumGreen = 0, leafCount = 0;
+        for (let idx = 0; idx < w * h; idx++) {
+          if (isLeafCandidate[idx] === 1) {
+            const pi = idx * 4;
+            sumGreen += (d[pi + 1] - (d[pi] + d[pi + 2]) / 2);
+            leafCount++;
+          }
+        }
+        const avgGreen = leafCount > 0 ? (sumGreen / leafCount) : 0;
+        if (avgGreen > 12) {
+          for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+              const idx = y * w + x;
+              if (isLeafCandidate[idx] === 1) {
+                const pi = idx * 4;
+                const localGreen = d[pi + 1] - (d[pi] + d[pi + 2]) / 2;
+                if (localGreen < avgGreen * 0.35) {
+                  const val = 150;
+                  mask[idx] = val;
+                  lesionPixels++;
+
+                  const gxCell = Math.min(gridDim - 1, Math.floor(x / cellW));
+                  const gyCell = Math.min(gridDim - 1, Math.floor(y / cellH));
+                  const gIdx = gyCell * gridDim + gxCell;
+                  gridAcc[gIdx].count += val;
+                  gridAcc[gIdx].sumX += x * val;
+                  gridAcc[gIdx].sumY += y * val;
+                }
+              }
             }
           }
         }
@@ -2435,19 +2555,19 @@ function applyDiseaseRedGlow(imgEl, diagnosis) {
         gctx.clearRect(0, 0, w, h);
         const t = now * 0.0035;
         const pulse = 0.72 + 0.28 * Math.sin(t);
-        const outerBlur = 12 + 6 * Math.sin(t);
+        const outerBlur = 6 + 3 * Math.sin(t);
 
         gctx.save();
         // Layer 1: Volumetric neon red bloom
         if (typeof gctx.filter !== 'undefined') {
           gctx.filter = `blur(${outerBlur.toFixed(1)}px)`;
         }
-        gctx.globalAlpha = 0.65 * pulse;
+        gctx.globalAlpha = 0.60 * pulse;
         gctx.drawImage(maskCanvas, 0, 0);
 
         // Layer 2: Tight crimson glow
         if (typeof gctx.filter !== 'undefined') {
-          gctx.filter = 'blur(4px)';
+          gctx.filter = 'blur(2.5px)';
         }
         gctx.globalAlpha = 0.85 * pulse;
         gctx.drawImage(maskCanvas, 0, 0);
