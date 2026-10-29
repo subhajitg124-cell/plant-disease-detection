@@ -258,8 +258,10 @@ class PlantDiseaseClassifier:
             top2_prob = float(sorted_probs[1].item()) if len(sorted_probs) > 1 else 0.0
             top5_sum  = float(sorted_probs[:5].sum().item())
 
-            # OOD if maximally uncertain (probabilities scattered across classes)
-            if h_norm > 0.85:
+            # OOD if maximally uncertain (probabilities scattered across ALL classes)
+            # Threshold raised from 0.85 to 0.95 — real images that are uncertain
+            # between similar disease classes have h_norm in range 0.80-0.90.
+            if h_norm > 0.95:
                 return VisionPrediction(
                     plant="Non-Plant / Unrecognised",
                     disease="Image Not Recognised",
@@ -273,8 +275,10 @@ class PlantDiseaseClassifier:
                     )
                 )
 
-            # OOD if top-5 classes don't even capture 35% of probability mass
-            if top5_sum < 0.35:
+            # OOD if top-5 classes don't capture meaningful probability mass.
+            # Threshold lowered from 0.35 to 0.20 — uncertain-but-real plant images
+            # may have top5_sum between 0.20-0.40 when genuinely ambiguous.
+            if top5_sum < 0.20:
                 return VisionPrediction(
                     plant="Non-Plant / Unrecognised",
                     disease="Image Not Recognised",

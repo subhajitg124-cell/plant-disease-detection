@@ -14,8 +14,10 @@ from src.retrieval.rag_retriever import RAGRetriever
 from src.advisory.advisory_generator import AdvisoryGenerator
 
 REJECTED_LOW_CONFIDENCE = "REJECTED_LOW_CONFIDENCE"
-# Minimum score required before returning a disease label. Uncertain inputs are rejected.
-MIN_CONFIDENCE_FLOOR = 0.50
+# Minimum score required before returning a disease label.
+# Uniform probability across 38 classes is ~0.026. Setting floor to 0.15 ensures that
+# validated plant leaves are diagnosed (as UNCERTAIN when < 0.50) while rejecting noise.
+MIN_CONFIDENCE_FLOOR = 0.15
 
 
 class PlantDiseasePipeline:
@@ -56,28 +58,43 @@ class PlantDiseasePipeline:
             prediction.status in (PredictionStatus.SUPPORTED.value, PredictionStatus.UNCERTAIN.value)
             and prediction.confidence < self.confidence_threshold
         ):
-            rejected_prediction = VisionPrediction(
-                plant="Non-Plant / Unrecognised",
-                disease="Image Not Recognised",
-                canonical_id="not_a_plant",
+            # If the image passed plant validation but CNN confidence is low,
+            # return the best-guess class with UNCERTAIN status instead of rejecting.
+            # Only reject completely if confidence is extremely low (< MIN_CONFIDENCE_FLOOR).
+            if prediction.confidence < MIN_CONFIDENCE_FLOOR:
+                rejected_prediction = VisionPrediction(
+                    plant="Non-Plant / Unrecognised",
+                    disease="Image Not Recognised",
+                    canonical_id="not_a_plant",
+                    confidence=prediction.confidence,
+                    status=PredictionStatus.NOT_A_PLANT.value,
+                    raw_label="low_confidence_rejected",
+                    embedding=None,
+                    model_version=prediction.model_version,
+                )
+                return IntegratedResponse(
+                    prediction=rejected_prediction,
+                    advisory=None,
+                    user_message="This image could not be confidently identified as a plant leaf. Please upload a clear, close-up leaf photo.",
+                    confidence=prediction.confidence,
+                    status=PredictionStatus.NOT_A_PLANT.value,
+                    evidence=[],
+                    sources=[],
+                    warnings=[
+                        f"Confidence {prediction.confidence:.3f} is below the "
+                        f"{MIN_CONFIDENCE_FLOOR:.2f} rejection threshold."
+                    ]
+                )
+            # Between MIN_CONFIDENCE_FLOOR and confidence_threshold: return best-guess as UNCERTAIN
+            prediction = VisionPrediction(
+                plant=prediction.plant,
+                disease=prediction.disease,
+                canonical_id=prediction.canonical_id,
                 confidence=prediction.confidence,
-                status=PredictionStatus.NOT_A_PLANT.value,
-                raw_label="low_confidence_rejected",
-                embedding=None,
+                status=PredictionStatus.UNCERTAIN.value,
+                raw_label=prediction.raw_label,
+                embedding=prediction.embedding,
                 model_version=prediction.model_version,
-            )
-            return IntegratedResponse(
-                prediction=rejected_prediction,
-                advisory=None,
-                user_message="This image could not be confidently identified as a plant leaf. Please upload a clear, close-up leaf photo.",
-                confidence=prediction.confidence,
-                status=PredictionStatus.NOT_A_PLANT.value,
-                evidence=[],
-                sources=[],
-                warnings=[
-                    f"Confidence {prediction.confidence:.3f} is below the "
-                    f"{self.confidence_threshold:.2f} rejection threshold."
-                ]
             )
         response = self.generator.generate_advisory(prediction)
         return response

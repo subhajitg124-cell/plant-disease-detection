@@ -11,7 +11,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
     rel="stylesheet" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌿</text></svg>" />
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌿</text></svg>" />
   <link rel="stylesheet" href="style.css" />
 </head>
 
@@ -21,7 +22,8 @@
   <nav id="navbar">
     <div class="nav-inner">
       <div class="nav-brand">
-        <svg class="brand-logo" width="32" height="32" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg class="brand-logo" width="32" height="32" viewBox="0 0 40 40" fill="none"
+          xmlns="http://www.w3.org/2000/svg">
           <defs>
             <linearGradient id="pd-grad" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="#4ade80" />
@@ -33,10 +35,12 @@
             </filter>
           </defs>
           <!-- Outer Optical Vision Aperture (Dristi) -->
-          <circle cx="20" cy="20" r="17.5" stroke="url(#pd-grad)" stroke-width="1.8" stroke-dasharray="4 2.5" opacity="0.7" />
+          <circle cx="20" cy="20" r="17.5" stroke="url(#pd-grad)" stroke-width="1.8" stroke-dasharray="4 2.5"
+            opacity="0.7" />
           <circle cx="20" cy="20" r="13" stroke="#22c55e" stroke-width="1" opacity="0.35" />
           <!-- Stylized Leaf (Patra) + Optical Eye Curve -->
-          <path d="M20 6C28.5 12.5 31.5 22 20 34C8.5 22 11.5 12.5 20 6Z" fill="url(#pd-grad)" opacity="0.92" filter="url(#pd-glow)" />
+          <path d="M20 6C28.5 12.5 31.5 22 20 34C8.5 22 11.5 12.5 20 6Z" fill="url(#pd-grad)" opacity="0.92"
+            filter="url(#pd-glow)" />
           <!-- Central Vein / Vision Focus Axis -->
           <path d="M20 9V31" stroke="#041f0f" stroke-width="2" stroke-linecap="round" />
           <path d="M20 15L25.5 12.5" stroke="#041f0f" stroke-width="1.5" stroke-linecap="round" />
@@ -49,10 +53,10 @@
       </div>
 
       <div class="nav-right">
-        <!-- Future Features Roadmap Button -->
-        <button class="nav-btn-pill" id="future-work-btn" type="button" title="View Upcoming AI Capabilities">
+        <!-- Agri Innovation Roadmap Button -->
+        <button class="nav-btn-pill" id="future-work-btn" type="button" title="View Upcoming Agricultural Innovations">
           <span class="pill-icon">&#x2728;</span>
-          <span class="pill-text">Future AI Lab</span>
+          <span class="pill-text">Agri Innovation</span>
           <span class="pill-badge">Roadmap</span>
         </button>
 
@@ -71,7 +75,7 @@
             <span class="user-role" id="nav-user-role">Guest Mode &bull; Preferences</span>
           </div>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M6 9l6 6 6-6"/>
+            <path d="M6 9l6 6 6-6" />
           </svg>
         </button>
 
@@ -125,7 +129,8 @@
             </svg>
           </div>
           <p class="upload-title">Drop your plant photo here</p>
-          <p class="upload-hint" id="upload-hint">Leaf, fruit, or flower &mdash; JPG, PNG, WebP &mdash; click to browse</p>
+          <p class="upload-hint" id="upload-hint">Leaf, fruit, or flower &mdash; JPG, PNG, WebP &mdash; click to browse
+          </p>
           <button class="btn-outline" id="browse-btn" type="button">Browse Files</button>
         </div>
 
@@ -195,7 +200,8 @@
           </svg>
         </div>
         <p class="empty-title">Ready to Diagnose</p>
-        <p class="empty-sub">Upload a leaf image or pick a sample specimen above. The AI model will calculate exact confidence percentages and full agricultural advisory.</p>
+        <p class="empty-sub">Upload a leaf image or pick a sample specimen above. The AI model will calculate exact
+          confidence percentages and full agricultural advisory.</p>
         <div class="empty-features">
           <div class="feat-item"><span>&#x1F52C;</span> CNN Vision Model</div>
           <div class="feat-item"><span>&#x1F4DA;</span> RAG Knowledge Base</div>
@@ -217,7 +223,8 @@
           </div>
           <div class="loading-step" id="ls-2">
             <div class="ls-icon">&#x1F9E0;</div>
-            <div class="ls-body"><span class="ls-name">Vision Model Classification</span><span class="ls-desc">Running neural
+            <div class="ls-body"><span class="ls-name">Vision Model Classification</span><span class="ls-desc">Running
+                neural
                 network inference</span></div>
             <div class="ls-status">
               <div class="ls-spinner hidden"></div>
@@ -225,7 +232,8 @@
           </div>
           <div class="loading-step" id="ls-3">
             <div class="ls-icon">&#x1F4DA;</div>
-            <div class="ls-body"><span class="ls-name">Knowledge Retrieval</span><span class="ls-desc">Fetching agricultural
+            <div class="ls-body"><span class="ls-name">Knowledge Retrieval</span><span class="ls-desc">Fetching
+                agricultural
                 knowledge base</span></div>
             <div class="ls-status">
               <div class="ls-spinner hidden"></div>
@@ -255,12 +263,14 @@
             <div class="diag-disease" id="diag-disease">--</div>
             <div class="diag-meta">
               <span class="diag-badge" id="diag-status-badge">--</span>
-              <span class="diag-badge" id="diag-conf-badge">--% Confidence</span>
+              <span class="diag-badge diag-badge-interactive" id="diag-conf-badge" role="button" tabindex="0" title="Click to inspect AI confidence calculation &amp; feature breakdown">
+                --% Confidence <span class="conf-info-pill">&#x2139;&#xFE0F; Why?</span>
+              </span>
               <span class="diag-canonical" id="diag-canonical">--</span>
               <span class="diag-latency" id="diag-latency">-- ms</span>
             </div>
           </div>
-          <div class="confidence-ring-wrap">
+          <div class="confidence-ring-wrap" id="confidence-ring-wrap" tabindex="0" role="button" title="Click to inspect AI confidence calculation &amp; feature breakdown" aria-label="Inspect AI Confidence Breakdown">
             <svg class="confidence-ring" viewBox="0 0 80 80">
               <circle class="ring-bg" cx="40" cy="40" r="32" />
               <circle class="ring-fill" id="ring-fill" cx="40" cy="40" r="32" />
@@ -268,6 +278,7 @@
             <div class="ring-center">
               <span class="ring-pct" id="ring-pct">0%</span>
               <span class="ring-label">Confidence</span>
+              <span class="ring-inspect-hint">Why? &#x2197;</span>
             </div>
           </div>
         </div>
@@ -325,9 +336,10 @@
 
         <!-- Action buttons -->
         <div class="result-actions">
-          <button class="btn-outline btn-sm" id="save-diary-btn" type="button" title="Save this scan to your personal Field Diary">
+          <button class="btn-outline btn-sm" id="save-diary-btn" type="button"
+            title="Save this scan to your personal Field Diary">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/>
+              <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
             </svg>
             Save to Diary
           </button>
@@ -354,17 +366,17 @@
     <div class="modal-card">
       <div class="modal-header">
         <div class="modal-title-wrap">
-          <span class="modal-icon">&#x1F464;</span>
+          <span class="modal-icon" id="profile-modal-icon">&#x1F510;</span>
           <div>
-            <h3 id="profile-title">PatraDristi Account &amp; Preferences</h3>
-            <p class="modal-sub">Manage your project-server account and field crop diagnostic preferences.</p>
+            <h3 id="profile-title">Sign In / Sign Up</h3>
+            <p class="modal-sub" id="profile-sub">Sign in to access your crop preferences, field diary, and personalized AI diagnosis.</p>
           </div>
         </div>
         <button class="modal-close-btn" id="close-profile-btn" aria-label="Close Profile Modal">&times;</button>
       </div>
 
-      <!-- Account Modal Sub-tabs -->
-      <div class="account-tabs">
+      <!-- Account Modal Sub-tabs (Hidden to cleanly merge login and field preferences) -->
+      <div class="account-tabs hidden" id="account-tabs-bar">
         <button class="account-tab-btn active" id="tab-btn-auth" data-tab="auth">
           <span>&#x1F510;</span> Sign In / Sign Up
         </button>
@@ -383,21 +395,25 @@
               <button class="auth-switch-btn" id="auth-mode-signup" type="button">Sign Up</button>
             </div>
 
-            <p id="auth-status" class="auth-status" role="status" aria-live="polite">Sign in to access your account, or continue as a guest.</p>
+            <p id="auth-status" class="auth-status" role="status" aria-live="polite">Sign in to access your account, or
+              continue as a guest.</p>
 
             <form id="auth-form" class="auth-form">
               <div class="form-group hidden" id="auth-name-group">
                 <label for="auth-name">Full Name</label>
-                <input type="text" id="auth-name" class="form-input" autocomplete="name" maxlength="80" placeholder="Your name" />
+                <input type="text" id="auth-name" class="form-input" autocomplete="name" maxlength="80"
+                  placeholder="Your name" />
               </div>
               <div class="form-group">
                 <label for="auth-email">Email Address</label>
-                <input type="email" id="auth-email" class="form-input" autocomplete="email" maxlength="254" required placeholder="you@example.com" />
+                <input type="email" id="auth-email" class="form-input" autocomplete="email" maxlength="254" required
+                  placeholder="you@example.com" />
               </div>
 
               <div class="form-group">
                 <label for="auth-password">Password</label>
-                <input type="password" id="auth-password" class="form-input" autocomplete="current-password" minlength="8" maxlength="128" required placeholder="At least 8 characters" />
+                <input type="password" id="auth-password" class="form-input" autocomplete="current-password"
+                  minlength="8" maxlength="128" required placeholder="At least 8 characters" />
               </div>
 
               <div class="auth-actions">
@@ -470,18 +486,30 @@
             <div class="form-group">
               <label>Primary Monitored Crops</label>
               <div class="crop-tags-grid" id="crop-tags-container">
-                <label class="crop-tag"><input type="checkbox" name="crops" value="Tomato" checked /><span>&#x1F345; Tomato</span></label>
-                <label class="crop-tag"><input type="checkbox" name="crops" value="Apple" checked /><span>&#x1F34E; Apple</span></label>
-                <label class="crop-tag"><input type="checkbox" name="crops" value="Corn" checked /><span>&#x1F33D; Corn</span></label>
-                <label class="crop-tag"><input type="checkbox" name="crops" value="Potato" checked /><span>&#x1F954; Potato</span></label>
-                <label class="crop-tag"><input type="checkbox" name="crops" value="Grape" checked /><span>&#x1F347; Grape</span></label>
-                <label class="crop-tag"><input type="checkbox" name="crops" value="Bell Pepper" checked /><span>&#x1FAD1; Bell Pepper</span></label>
-                <label class="crop-tag"><input type="checkbox" name="crops" value="Strawberry" /><span>&#x1F353; Strawberry</span></label>
-                <label class="crop-tag"><input type="checkbox" name="crops" value="Peach" /><span>&#x1F351; Peach</span></label>
-                <label class="crop-tag"><input type="checkbox" name="crops" value="Cherry" /><span>&#x1F352; Cherry</span></label>
-                <label class="crop-tag"><input type="checkbox" name="crops" value="Soybean" /><span>&#x1F33F; Soybean</span></label>
-                <label class="crop-tag"><input type="checkbox" name="crops" value="Blueberry" /><span>&#x1FAD0; Blueberry</span></label>
-                <label class="crop-tag"><input type="checkbox" name="crops" value="Orange" /><span>&#x1F34A; Orange</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Tomato" checked /><span>&#x1F345;
+                    Tomato</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Apple" checked /><span>&#x1F34E;
+                    Apple</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Corn" checked /><span>&#x1F33D;
+                    Corn</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Potato" checked /><span>&#x1F954;
+                    Potato</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Grape" checked /><span>&#x1F347;
+                    Grape</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Bell Pepper"
+                    checked /><span>&#x1FAD1; Bell Pepper</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Strawberry" /><span>&#x1F353;
+                    Strawberry</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Peach" /><span>&#x1F351;
+                    Peach</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Cherry" /><span>&#x1F352;
+                    Cherry</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Soybean" /><span>&#x1F33F;
+                    Soybean</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Blueberry" /><span>&#x1FAD0;
+                    Blueberry</span></label>
+                <label class="crop-tag"><input type="checkbox" name="crops" value="Orange" /><span>&#x1F34A;
+                    Orange</span></label>
               </div>
             </div>
 
@@ -509,22 +537,227 @@
               <button class="btn-primary btn-sm" id="save-profile-btn" type="button">Save Profile Changes</button>
             </div>
           </form>
+
+          <!-- ── LOGOUT OPTION AT END OF PREFERENCES ── -->
+          <div class="profile-logout-section">
+            <div class="profile-session-info">
+              <span class="profile-session-avatar">&#x1F468;&#x200D;&#x1F33E;</span>
+              <div class="profile-session-text">
+                <span class="profile-session-label">Active Session</span>
+                <span class="profile-session-user" id="pref-user-email">user@example.com</span>
+              </div>
+            </div>
+            <button class="btn-outline btn-sm text-danger" id="pref-logout-btn" type="button">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+              Sign Out / Logout
+            </button>
+          </div>
         </div>
 
       </div>
     </div>
   </div>
 
+  <!-- ── FIELD DIARY / SCAN HISTORY MODAL ── -->
+  <div id="history-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="history-title">
+    <div class="modal-card modal-card-wide">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="modal-icon">&#x1F4D6;</span>
+          <div>
+            <h3 id="history-title">Field Diary &amp; Scan History</h3>
+            <p class="modal-sub">Historical crop diagnoses, disease progression records, and field findings.</p>
+          </div>
+        </div>
+        <button class="modal-close-btn" id="close-history-btn" aria-label="Close History Modal">&times;</button>
+      </div>
+
+      <div class="history-controls">
+        <div class="history-search-wrap">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input type="text" id="history-search" class="history-search-input"
+            placeholder="Search by crop, disease, or pathogen..." />
+        </div>
+        <div class="history-filters">
+          <button class="history-filter-btn active" data-filter="all">All</button>
+          <button class="history-filter-btn" data-filter="diseased">Diseased</button>
+          <button class="history-filter-btn" data-filter="healthy">Healthy</button>
+        </div>
+        <div class="history-actions-bar">
+          <button class="btn-outline btn-sm" id="export-history-btn" type="button">Export Logs (JSON)</button>
+          <button class="btn-ghost btn-sm text-danger" id="clear-history-btn" type="button">Clear Diary</button>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <div id="history-list" class="history-grid">
+          <!-- Populated dynamically via JS -->
+        </div>
+        <div id="history-empty" class="history-empty hidden">
+          <div class="empty-icon">&#x1F33F;</div>
+          <p class="empty-title">No Scans Recorded Yet</p>
+          <p class="empty-sub">When you diagnose leaves or click "Save to Diary", your findings will appear here with
+            full advisories.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── AGRI INNOVATION & ROADMAP MODAL ── -->
+  <div id="future-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="future-title">
+    <div class="modal-card modal-card-wide">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="modal-icon">&#x2728;</span>
+          <div>
+            <h3 id="future-title">Agri Innovation &bull; Agricultural Roadmap</h3>
+            <p class="modal-sub">Next-generation features in development for precision crop disease prevention and field
+              automation.</p>
+          </div>
+        </div>
+        <button class="modal-close-btn" id="close-future-btn" aria-label="Close Future Modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="roadmap-grid">
+
+          <div class="roadmap-card">
+            <div class="roadmap-badge ready">&#x1F680; In Development</div>
+            <div class="roadmap-icon">&#x26C5;</div>
+            <h4>Microclimate Spore Risk Forecaster</h4>
+            <p>Predicts fungal and bacterial outbreak risk 48 hours in advance by cross-referencing local humidity,
+              temperature fluctuations, and dew point.</p>
+            <div class="roadmap-tags">
+              <span>Weather API</span><span>Spore Modeling</span><span>Early Warning</span>
+            </div>
+            <button class="btn-outline btn-xs roadmap-vote-btn" data-feature="Microclimate Risk Forecaster">
+              &#x1F44D; Request Early Beta
+            </button>
+          </div>
+
+          <div class="roadmap-card">
+            <div class="roadmap-badge prototype">&#x1F6F0; Prototype</div>
+            <div class="roadmap-icon">&#x1F681;</div>
+            <h4>Drone &amp; Multi-Spectral Canopy Imaging</h4>
+            <p>Upload aerial DJI Agras / Parrot drone multispectral geotiffs. The AI detects NDVI vegetative index
+              anomalies and pinpoints disease hot zones across entire fields.</p>
+            <div class="roadmap-tags">
+              <span>NDVI Analysis</span><span>GIS Mapping</span><span>Precision Spraying</span>
+            </div>
+            <button class="btn-outline btn-xs roadmap-vote-btn" data-feature="Drone Canopy Imaging">
+              &#x1F44D; Request Early Beta
+            </button>
+          </div>
+
+          <div class="roadmap-card">
+            <div class="roadmap-badge research">&#x1F9EA; Research Phase</div>
+            <div class="roadmap-icon">&#x1F9EA;</div>
+            <h4>Soil Nutrient &amp; N-P-K Deficiency Linker</h4>
+            <p>Correlates foliar chlorosis and leaf curl with soil test data. Generates precise organic fertilizer
+              formulations to cure root and nutrient imbalances.</p>
+            <div class="roadmap-tags">
+              <span>Soil Chemistry</span><span>N-P-K Balancer</span><span>pH Correction</span>
+            </div>
+            <button class="btn-outline btn-xs roadmap-vote-btn" data-feature="Soil Nutrient Linker">
+              &#x1F44D; Request Early Beta
+            </button>
+          </div>
+
+          <div class="roadmap-card">
+            <div class="roadmap-badge ready">&#x1F4F1; In Development</div>
+            <div class="roadmap-icon">&#x1F4F6;</div>
+            <h4>Offline Edge-AI PWA Mode</h4>
+            <p>On-device WebAssembly and ONNX quantized vision models that run in offline rural fields with zero
+              cellular connectivity.</p>
+            <div class="roadmap-tags">
+              <span>WebAssembly</span><span>ONNX Edge</span><span>Offline Sync</span>
+            </div>
+            <button class="btn-outline btn-xs roadmap-vote-btn" data-feature="Offline Edge-AI Mode">
+              &#x1F44D; Request Early Beta
+            </button>
+          </div>
+
+          <div class="roadmap-card">
+            <div class="roadmap-badge prototype">&#x1F310; Prototype</div>
+            <div class="roadmap-icon">&#x1F5E3;&#xFE0F;</div>
+            <h4>Multilingual Voice Agronomist</h4>
+            <p>Real-time conversational voice assistant supporting regional agricultural dialects (Hindi, Bengali,
+              Spanish, Punjabi, Swahili) with voice-guided spray steps.</p>
+            <div class="roadmap-tags">
+              <span>Speech-to-Text</span><span>12+ Languages</span><span>Hands-free</span>
+            </div>
+            <button class="btn-outline btn-xs roadmap-vote-btn" data-feature="Multilingual Voice Agronomist">
+              &#x1F44D; Request Early Beta
+            </button>
+          </div>
+
+          <div class="roadmap-card">
+            <div class="roadmap-badge research">&#x1F91D; Planned</div>
+            <div class="roadmap-icon">&#x1F9D1;&#x200D;&#x2695;&#xFE0F;</div>
+            <h4>Verified Agronomist Tele-Consult</h4>
+            <p>One-click escalation to certified regional crop specialists and university agricultural extension
+              officers with attached AI diagnostic dossiers.</p>
+            <div class="roadmap-tags">
+              <span>Tele-Consult</span><span>Certified Doctors</span><span>Govt Extension</span>
+            </div>
+            <button class="btn-outline btn-xs roadmap-vote-btn" data-feature="Agronomist Tele-Consult">
+              &#x1F44D; Request Early Beta
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── AI CONFIDENCE & DIAGNOSTIC EXPLAINABILITY (XAI) MODAL ── -->
+  <div id="confidence-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="conf-modal-title">
+    <div class="modal-card modal-card-wide">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="modal-icon">&#x1F4CA;</span>
+          <div>
+            <h3 id="conf-modal-title">AI Confidence &amp; Diagnostic Breakdown</h3>
+            <p class="modal-sub">Explainable AI (XAI): Softmax probability competition, visual feature attribution &amp; input telemetry.</p>
+          </div>
+        </div>
+        <button class="modal-close-btn" id="close-conf-modal-btn" aria-label="Close Confidence Breakdown">&times;</button>
+      </div>
+      <div class="modal-body" id="conf-modal-body">
+        <!-- Dynamically rendered by app.js -->
+      </div>
+    </div>
+  </div>
+
   <!-- FOOTER -->
   <footer class="footer">
-    <p>PatraDristi AI &mdash; CNN + RAG Plant Disease Detection &middot; 38 classes &middot; 14 crops &middot;
-      PlantVillage Dataset</p>
+    <div class="footer-inner">
+      <p>PatraDristi AI &mdash; CNN + RAG Plant Disease Detection &middot; 38 classes &middot; 14 crops</p>
+      <div id="footer-auth-section" class="footer-auth-section hidden">
+        <span class="footer-user-text">Signed in as <strong id="footer-user-email"></strong></span>
+        <button class="btn-outline btn-xs text-danger" id="footer-logout-btn" type="button">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+          Log Out
+        </button>
+      </div>
+    </div>
   </footer>
 
   <!-- Toast notifications -->
   <div id="toast" class="toast hidden" role="alert"></div>
 
-  <script src="app.js?v=10"></script>
+  <script src="app.js?v=12"></script>
 </body>
 
 </html>

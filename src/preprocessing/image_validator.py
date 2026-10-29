@@ -177,13 +177,17 @@ class ImageValidator:
 
         if HAS_CV2:
             hsv = cv2.cvtColor(img_arr, cv2.COLOR_RGB2HSV)
-            # Green and chlorotic-yellow foliage; hue 10-105 excludes red/orange objects and flowers.
-            mask_green = cv2.inRange(hsv, np.array([10, 25, 25]), np.array([105, 255, 255]))
+            # Green & chlorotic yellow foliage
+            mask_green = cv2.inRange(hsv, np.array([22, 25, 25]), np.array([105, 255, 255]))
+            # Foliar necrotic lesions (brown / dark blight spots on leaves)
+            mask_brown = cv2.inRange(hsv, np.array([8, 30, 25]), np.array([22, 220, 220]))
+            # Combined plant tissue
+            plant_combined = cv2.bitwise_or(mask_green, mask_brown)
 
             # Sky-blue exclusion — pixels that are sky-blue are NOT plant tissue
             sky_mask = cv2.inRange(hsv, np.array([95, 40, 100]), np.array([130, 255, 255]))
 
-            combined = mask_green & ~sky_mask
+            combined = plant_combined & ~sky_mask
             ratio = np.count_nonzero(combined) / float(img_arr.shape[0] * img_arr.shape[1])
         else:
             r = img_arr[:, :, 0].astype(np.float32)
@@ -300,17 +304,16 @@ class ImageValidator:
             variance, edge_density = self.evaluate_texture_and_edges(img)
 
             # Layers 5 & 6: Texture variance and edge density check.
-            # Flat solid fills and pure digital graphics have near-zero variance (< 4.0)
-            # AND zero edge density (< 0.0005). Genuine leaves (even smooth close-ups or soft-focus)
-            # have natural organic variation and must not be rejected.
-            if variance < self.texture_variance_threshold and edge_density < self.edge_density_min:
+            # Flat solid fills, digital screenshots, and computer graphics have near-zero
+            # variance (< 4.0) over plant-colored pixels. Genuine leaves have natural
+            # organic variation (typically variance > 100).
+            if variance < self.texture_variance_threshold or (variance < 12.0 and edge_density < self.edge_density_min):
                 return {
                     "is_valid": False,
                     "status": PredictionStatus.NOT_A_PLANT.value,
                     "reason": (
-                        f"Image appears to be a flat graphic or blank fill "
-                        f"(pixel variance {variance:.1f}, edge density {edge_density:.4f}), "
-                        "not a natural plant photo."
+                        f"Image appears to be a flat graphic, screenshot, or solid fill "
+                        f"(pixel variance {variance:.1f}), not a natural plant photo."
                     ),
                     "foliage_ratio": foliage_ratio,
                     "image": img,
