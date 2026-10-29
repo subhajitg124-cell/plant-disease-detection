@@ -136,7 +136,14 @@
 
         <!-- Preview state -->
         <div id="upload-preview" class="hidden">
-          <img id="preview-img" src="" alt="Uploaded leaf" />
+          <div class="preview-img-container" id="preview-img-container">
+            <img id="preview-img" src="" alt="Uploaded leaf" />
+            <canvas id="disease-glow-canvas" class="disease-glow-canvas"></canvas>
+            <div id="disease-alert-pill" class="disease-alert-pill hidden">
+              <span class="disease-pulse-dot"></span>
+              <span id="disease-alert-text">Infection Zone</span>
+            </div>
+          </div>
           <div class="preview-controls">
             <button class="btn-ghost" id="change-img-btn" type="button">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

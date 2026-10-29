@@ -1543,21 +1543,26 @@ function getAdvisory(canonical) {
 }
 
 // ─── DOM REFERENCES ───────────────────────────────────────────────────────────
-const uploadZone     = document.getElementById('upload-zone');
-const fileInput      = document.getElementById('file-input');
-const browseBtn      = document.getElementById('browse-btn');
-const previewImg     = document.getElementById('preview-img');
-const idleEl         = document.getElementById('upload-idle');
-const previewEl      = document.getElementById('upload-preview');
-const invalidEl      = document.getElementById('invalid-leaf-msg');
-const retryBtn       = document.getElementById('retry-btn');
-const changeBtn      = document.getElementById('change-img-btn');
-const analyseBtn     = document.getElementById('analyse-btn');
-const analyseTxt     = document.getElementById('analyse-btn-text');
-const toast          = document.getElementById('toast');
+const uploadZone          = document.getElementById('upload-zone');
+const fileInput           = document.getElementById('file-input');
+const browseBtn           = document.getElementById('browse-btn');
+const previewImg          = document.getElementById('preview-img');
+const previewImgContainer = document.getElementById('preview-img-container');
+const diseaseGlowCanvas   = document.getElementById('disease-glow-canvas');
+const diseaseAlertPill    = document.getElementById('disease-alert-pill');
+const diseaseAlertText    = document.getElementById('disease-alert-text');
+const idleEl              = document.getElementById('upload-idle');
+const previewEl           = document.getElementById('upload-preview');
+const invalidEl           = document.getElementById('invalid-leaf-msg');
+const retryBtn            = document.getElementById('retry-btn');
+const changeBtn           = document.getElementById('change-img-btn');
+const analyseBtn          = document.getElementById('analyse-btn');
+const analyseTxt          = document.getElementById('analyse-btn-text');
+const toast               = document.getElementById('toast');
 
-let uploadedFile     = null;
-let currentResult    = null;
+let uploadedFile          = null;
+let currentResult         = null;
+let diseaseGlowAnimId     = null;
 
 // ─── TOAST NOTIFICATIONS ──────────────────────────────────────────────────────
 let toastTimer;
@@ -1647,6 +1652,7 @@ function getImageAsBase64(imgElement) {
 
 // ─── FILE HANDLING ────────────────────────────────────────────────────────────
 function showIdle() {
+  clearDiseaseRedGlow();
   idleEl?.classList.remove('hidden');
   previewEl?.classList.add('hidden');
   invalidEl?.classList.add('hidden');
@@ -1657,6 +1663,7 @@ function showPreview() {
   invalidEl?.classList.add('hidden');
 }
 function showInvalid(msg) {
+  clearDiseaseRedGlow();
   idleEl?.classList.add('hidden');
   previewEl?.classList.add('hidden');
   invalidEl?.classList.remove('hidden');
@@ -1674,6 +1681,7 @@ function handleFile(file) {
     showToast('Please select a valid image file (JPG, PNG, WebP)', 'error');
     return;
   }
+  clearDiseaseRedGlow();
   hideAll();
   document.getElementById('results-empty')?.classList.remove('hidden');
   const reader = new FileReader();
@@ -1778,6 +1786,7 @@ document.querySelectorAll('.sample-chip').forEach(chip => {
     ];
 
     function activateAndAnalyse(imgSrc) {
+      clearDiseaseRedGlow();
       previewImg.src = imgSrc;
       uploadedFile = { name: `${canonical}_sample.jpg`, type: 'image/jpeg', _sample: canonical };
       showPreview();
@@ -2242,6 +2251,7 @@ function showResults(r) {
   }
 
   switchTab('symptoms');
+  applyDiseaseRedGlow(previewImg, r);
   if (isNotPlant) {
     showToast('Image not recognised as a plant leaf — see analysis tips below.', 'warning', 4000);
   } else {
@@ -2251,6 +2261,268 @@ function showResults(r) {
         : `${r.disease} detected (${pctDisplay} confidence)`,
       isHealthy ? 'success' : 'info'
     );
+  }
+}
+
+// ─── LEAF DISEASE RED GLOW EFFECT ───────────────────────────────────────────
+function clearDiseaseRedGlow() {
+  if (diseaseGlowAnimId) {
+    cancelAnimationFrame(diseaseGlowAnimId);
+    diseaseGlowAnimId = null;
+  }
+  if (diseaseGlowCanvas) {
+    const ctx = diseaseGlowCanvas.getContext('2d');
+    if (ctx) ctx.clearRect(0, 0, diseaseGlowCanvas.width, diseaseGlowCanvas.height);
+  }
+  if (previewImgContainer) {
+    previewImgContainer.classList.remove('has-disease-glow');
+  }
+  if (diseaseAlertPill) {
+    diseaseAlertPill.classList.add('hidden');
+  }
+}
+
+function applyDiseaseRedGlow(imgEl, diagnosis) {
+  clearDiseaseRedGlow();
+  if (!imgEl || !diagnosis) return;
+
+  const isHealthy = diagnosis.health_status === 'healthy' || diagnosis.canonical?.includes('healthy');
+  const isNotPlant = diagnosis.health_status === 'not_a_plant' || diagnosis.canonical === 'not_a_plant';
+
+  // Only apply red glow if a real plant disease was detected
+  if (isHealthy || isNotPlant) {
+    return;
+  }
+
+  function startGlow() {
+    try {
+      const w = imgEl.naturalWidth || imgEl.clientWidth || 256;
+      const h = imgEl.naturalHeight || imgEl.clientHeight || 256;
+      if (!diseaseGlowCanvas) return;
+      diseaseGlowCanvas.width = w;
+      diseaseGlowCanvas.height = h;
+
+      // Extract diseased lesion pixels
+      const off = document.createElement('canvas');
+      off.width = w;
+      off.height = h;
+      const octx = off.getContext('2d', { willReadFrequently: true });
+      octx.drawImage(imgEl, 0, 0, w, h);
+      const imgData = octx.getImageData(0, 0, w, h);
+      const d = imgData.data;
+
+      const mask = new Uint8Array(w * h);
+      let leafPixels = 0;
+      let lesionPixels = 0;
+
+      // 4x4 spatial grid for hotspot centroids
+      const gridDim = 4;
+      const cellW = w / gridDim;
+      const cellH = h / gridDim;
+      const gridAcc = Array.from({ length: gridDim * gridDim }, () => ({ count: 0, sumX: 0, sumY: 0 }));
+
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          const r = d[i], g = d[i + 1], b = d[i + 2];
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          const diff = max - min;
+
+          // Background filter
+          if (max < 18) continue; // black
+          if (r > 205 && g > 205 && b > 205 && diff < 26) continue; // white/gray
+          if (b > r + 30 && b > g + 20 && b > 75) continue; // blue
+
+          leafPixels++;
+
+          const isHealthyGreen = (g > r * 1.05 && g > b * 1.05 && g > 35);
+
+          let score = 0;
+          // Dark necrotic lesion (blight, scab, rot)
+          if (!isHealthyGreen && max < 75 && max > 18) {
+            score = Math.max(score, (75 - max) / 55);
+          }
+          // Brown necrosis
+          if (r > 38 && r > g && r > b + 10 && g < 160) {
+            const brownVal = (r - g) + (r - b);
+            score = Math.max(score, Math.min(1.0, brownVal / 50));
+          }
+          // Chlorotic yellow halos
+          if (!isHealthyGreen && r > 90 && g > 85 && b < 125 && (r + g) > b * 2.2 && Math.abs(r - g) < 55) {
+            score = Math.max(score, 0.7);
+          }
+          // Rust orange pustules
+          if (r > 105 && r > g * 1.2 && r > b * 1.4) {
+            score = Math.max(score, Math.min(1.0, (r - g * 1.1) / 45));
+          }
+          // Powdery mildew
+          if (r > 145 && g > 145 && b > 135 && diff < 25 && max < 215) {
+            score = Math.max(score, 0.75);
+          }
+
+          if (score > 0.25) {
+            const val = Math.min(255, Math.round(score * 255));
+            mask[y * w + x] = val;
+            lesionPixels++;
+
+            const gx = Math.min(gridDim - 1, Math.floor(x / cellW));
+            const gy = Math.min(gridDim - 1, Math.floor(y / cellH));
+            const gIdx = gy * gridDim + gx;
+            gridAcc[gIdx].count += val;
+            gridAcc[gIdx].sumX += x * val;
+            gridAcc[gIdx].sumY += y * val;
+          }
+        }
+      }
+
+      // Fallback: if lesion color heuristics were sparse but disease was confirmed by CNN
+      if (lesionPixels < leafPixels * 0.05 && leafPixels > 100) {
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const i = (y * w + x) * 4;
+            const r = d[i], g = d[i + 1], b = d[i + 2];
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            if (max < 18 || (r > 205 && g > 205 && b > 205 && max - min < 26)) continue;
+            if (!(g > r * 1.08 && g > b * 1.08)) {
+              mask[y * w + x] = 180;
+              lesionPixels++;
+            }
+          }
+        }
+      }
+
+      // Top hotspots for reticle target rings
+      const hotspots = gridAcc
+        .filter(g => g.count > 0)
+        .map(g => ({ x: g.sumX / g.count, y: g.sumY / g.count, weight: g.count }))
+        .sort((a, b) => b.weight - a.weight)
+        .slice(0, 3);
+
+      // Create offscreen texture of the red glowing lesion mask
+      const maskCanvas = document.createElement('canvas');
+      maskCanvas.width = w;
+      maskCanvas.height = h;
+      const mctx = maskCanvas.getContext('2d');
+      const mImgData = mctx.createImageData(w, h);
+      const md = mImgData.data;
+
+      for (let i = 0; i < mask.length; i++) {
+        const val = mask[i];
+        if (val > 0) {
+          const pi = i * 4;
+          md[pi]     = 255;                                // Pure Red
+          md[pi + 1] = Math.round(25 * (1 - val / 255));   // Warmth
+          md[pi + 2] = Math.round(45 * (1 - val / 255));
+          md[pi + 3] = Math.min(235, Math.round(val * 0.95)); // Alpha
+        }
+      }
+      mctx.putImageData(mImgData, 0, 0);
+
+      // Show container glow and alert pill
+      if (previewImgContainer) previewImgContainer.classList.add('has-disease-glow');
+      if (diseaseAlertPill) {
+        diseaseAlertPill.classList.remove('hidden');
+        const pct = leafPixels > 0 ? Math.round((lesionPixels / leafPixels) * 100) : 0;
+        if (diseaseAlertText) diseaseAlertText.textContent = `Infection Zone (${pct}% Area)`;
+      }
+
+      const gctx = diseaseGlowCanvas.getContext('2d');
+
+      // 60FPS animation loop for pulsating red glow
+      function loop(now) {
+        gctx.clearRect(0, 0, w, h);
+        const t = now * 0.0035;
+        const pulse = 0.72 + 0.28 * Math.sin(t);
+        const outerBlur = 12 + 6 * Math.sin(t);
+
+        gctx.save();
+        // Layer 1: Volumetric neon red bloom
+        if (typeof gctx.filter !== 'undefined') {
+          gctx.filter = `blur(${outerBlur.toFixed(1)}px)`;
+        }
+        gctx.globalAlpha = 0.65 * pulse;
+        gctx.drawImage(maskCanvas, 0, 0);
+
+        // Layer 2: Tight crimson glow
+        if (typeof gctx.filter !== 'undefined') {
+          gctx.filter = 'blur(4px)';
+        }
+        gctx.globalAlpha = 0.85 * pulse;
+        gctx.drawImage(maskCanvas, 0, 0);
+
+        // Layer 3: Crisp lesion definition
+        if (typeof gctx.filter !== 'undefined') {
+          gctx.filter = 'none';
+        }
+        gctx.globalAlpha = 0.95;
+        gctx.drawImage(maskCanvas, 0, 0);
+        gctx.restore();
+
+        // Layer 4: Hotspot target rings over primary infection sites
+        hotspots.forEach((spot, idx) => {
+          const ringPhase = (now * 0.035 + idx * 400) % 600;
+          const ringProgress = ringPhase / 600;
+          const ringRadius = 10 + ringProgress * 26;
+          const ringAlpha = Math.max(0, 1 - ringProgress) * 0.85;
+
+          gctx.save();
+          gctx.strokeStyle = `rgba(255, 50, 75, ${ringAlpha})`;
+          gctx.lineWidth = 1.6;
+          gctx.beginPath();
+          gctx.arc(spot.x, spot.y, ringRadius, 0, 2 * Math.PI);
+          gctx.stroke();
+
+          // Dot
+          gctx.fillStyle = `rgba(255, 30, 50, ${0.8 + 0.2 * Math.sin(t * 1.5)})`;
+          gctx.shadowColor = '#ef4444';
+          gctx.shadowBlur = 8;
+          gctx.beginPath();
+          gctx.arc(spot.x, spot.y, 4, 0, 2 * Math.PI);
+          gctx.fill();
+
+          // Corner brackets
+          gctx.strokeStyle = `rgba(255, 120, 140, ${0.75 * pulse})`;
+          gctx.lineWidth = 1.2;
+          gctx.shadowBlur = 4;
+          const bSize = 6, bDist = 9;
+          // Top-left
+          gctx.beginPath();
+          gctx.moveTo(spot.x - bDist, spot.y - bDist + bSize);
+          gctx.lineTo(spot.x - bDist, spot.y - bDist);
+          gctx.lineTo(spot.x - bDist + bSize, spot.y - bDist);
+          // Top-right
+          gctx.moveTo(spot.x + bDist - bSize, spot.y - bDist);
+          gctx.lineTo(spot.x + bDist, spot.y - bDist);
+          gctx.lineTo(spot.x + bDist, spot.y - bDist + bSize);
+          // Bottom-left
+          gctx.beginPath();
+          gctx.moveTo(spot.x - bDist, spot.y + bDist - bSize);
+          gctx.lineTo(spot.x - bDist, spot.y + bDist);
+          gctx.lineTo(spot.x - bDist + bSize, spot.y + bDist);
+          // Bottom-right
+          gctx.moveTo(spot.x + bDist - bSize, spot.y + bDist);
+          gctx.lineTo(spot.x + bDist, spot.y + bDist);
+          gctx.lineTo(spot.x + bDist - bSize, spot.y + bDist);
+          gctx.stroke();
+
+          gctx.restore();
+        });
+
+        diseaseGlowAnimId = requestAnimationFrame(loop);
+      }
+
+      diseaseGlowAnimId = requestAnimationFrame(loop);
+    } catch (e) {
+      console.warn('Could not apply disease red glow effect:', e);
+    }
+  }
+
+  if (imgEl.complete && imgEl.naturalWidth > 0) {
+    startGlow();
+  } else {
+    imgEl.onload = () => startGlow();
   }
 }
 
